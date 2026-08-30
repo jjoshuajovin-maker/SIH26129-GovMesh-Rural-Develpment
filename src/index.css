@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 font-sans;
+  }
+}
+
+/* Custom Govt Portal styling touches */
+.gov-header-bg {
+  background: linear-gradient(135deg, #002B49 0%, #004B87 100%);
+}
+
+.gov-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider;
+}

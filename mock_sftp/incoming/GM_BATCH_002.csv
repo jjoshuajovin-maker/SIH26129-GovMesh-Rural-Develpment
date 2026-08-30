@@ -1,0 +1,102 @@
+application_id,citizen_name,address,district,verified
+GM-2026-000125,Ramesh Patil,Plot 12 Gram Panchayat Road,,true
+GM-2026-000126,Sunita Deshmukh,Main Bazaar Road Village Sinnar,Nashik,true
+GM-2026-000127,Anil Kulkarni,House 45 Near Zilla Parishad School,Nagpur,true
+GM-2026-000128,INVALID_APP_ID_999,Subhash Nagar Post Office,Kolhapur,true
+GM-2026-000129,Priya Shinde,Shivaji Chowk Village Baramati,Pune,true
+GM-2026-000130,Vikram Pawar,Station Road Village Karad,Satara,true
+GM-2026-000131,Asha More,Gram Sabha Galli,Chhatrapati Sambhajinagar,true
+GM-2026-000132,Prakash Jadhav,Old Fort Road Village Wai,Satara,true
+GM-2026-000132,Prakash Jadhav,Old Fort Road Village Wai,Satara,true
+GM-2026-000133,Sanjay Joshi,Taluka Panchayat Marg,Amravati,true
+GM-2026-000134,Meena Chavan,Zilla Parishad Colony,Nanded,true
+GM-2026-000135,Ganesh Gaikwad,Temple Street Village Rahuri,Ahilyanagar,true
+GM-2026-000136,Kavita Bhosale,Main Market Yard,Solapur,true
+GM-2026-000137,Vijay Sawant,Panchayat Samiti Office Lane,Ratnagiri,true
+GM-2026-000138,Rekha Kamble,Bhim Nagar Ward 2,Sangli,true
+GM-2026-000139,Mahesh Wagh,Primary Health Centre Road,Jalgaon,true
+GM-2026-000140,Savita Naik,Mahatma Gandhi Marg,Sindhudurg,true
+GM-2026-000141,Rahul Thorat,Krishi Seva Kendra Chowk,Latur,true
+GM-2026-000142,Pooja Mane,Anganwadi Lane Village Daund,Pune,true
+GM-2026-000143,Deepak Shelke,Talathi Office Road,Osmanabad,true
+GM-2026-000144,Archana Mule,Panchayat Ghar Ward 1,Parbhani,true
+GM-2026-000145,Suresh Jagtap,High School Marg,Beed,true
+GM-2026-000146,Nisha Solanke,Bypass Road Village Yeola,Nashik,true
+GM-2026-000147,Amit Kadam,Sugar Factory Colony,Kolhapur,true
+GM-2026-000148,Varsha Gavit,Adivasi Ashram Shala Road,Nandurbar,true
+GM-2026-000149,Nitin Mohite,Veterinary Hospital Lane,Satara,true
+GM-2026-000150,Kiran Raut,Gram Vikas Bhavan Road,Nagpur,true
+GM-2026-000151,Swati Phadke,Milk Dairy Chowk,Pune,true
+GM-2026-000152,Sachin Ingale,Nadi Kinara Village Shirur,Pune,true
+GM-2026-000153,Bharti Khare,Bus Stand Marg,Buldhana,true
+GM-2026-000154,Ashok Lokhande,Panchayat Office Lane,Washim,true
+GM-2026-000155,Lata Dhage,Fort View Ward 3,Chhatrapati Sambhajinagar,true
+GM-2026-000156,Rajesh Salunkhe,Weekly Market Ground,Solapur,true
+GM-2026-000157,Sharmila Pande,River Bank Colony,Gondia,true
+GM-2026-000158,Manoj Landge,Water Tank Road,Bhandara,true
+GM-2026-000159,Sujata Mahajan,Krishi Vigyan Kendra Road,Jalna,true
+GM-2026-000160,Rohan Bangar,Post Office Chowk,Hingoli,true
+GM-2026-000161,Anita Thakare,Forest Office Road,Gadchiroli,true
+GM-2026-000162,Dnyaneshwar Mhatre,Coastal Road Village Alibag,Raigad,true
+GM-2026-000163,Manjusha Sanap,Gram Panchayat Complex,Ahilyanagar,true
+GM-2026-000164,Vikas Gore,Taluka Hospital Marg,Akola,true
+GM-2026-000165,Seema Narwade,School Field Road,Yavatmal,true
+GM-2026-000166,Pravin Khot,Dairy Society Lane,Kolhapur,true
+GM-2026-000167,Sandhya Sutar,Carpenters Lane Village Pen,Raigad,true
+GM-2026-000168,Avinash Rane,Gram Samiti Hall,Sindhudurg,true
+GM-2026-000169,Geeta Bhalerao,Dr Ambedkar Chowk,Wardha,true
+GM-2026-000170,Tushar Dhumal,Hilltop Colony Village Igatpuri,Nashik,true
+GM-2026-000171,Usha Kakade,Irrigation Colony,Chandrapur,true
+GM-2026-000172,Dhananjay Padwal,Canal Road Village Indapur,Pune,true
+GM-2026-000173,Komal Badhe,Gram Panchayat Shop 4,Satara,true
+GM-2026-000174,Sharad Sonawane,Railway Station Marg,Chhatrapati Sambhajinagar,true
+GM-2026-000175,Pallavi Shinde,Cooperative Society Building,Solapur,true
+GM-2026-000176,Chetan Mhaske,Polytechnic Road,Ahilyanagar,true
+GM-2026-000177,Rohini Garad,Talathi Karyalaya Chowk,Latur,true
+GM-2026-000178,Sameer Bhujbal,Market Yard Gate 2,Nashik,true
+GM-2026-000179,Trupti Godse,Old Temple Street,Kolhapur,true
+GM-2026-000180,Prashant Shelake,Bypass Circle,Nagpur,true
+GM-2026-000181,Shraddha Zende,Mahila Mandal Bhavan,Pune,true
+GM-2026-000182,Yogesh Lad,Koliwada Village Malvan,Sindhudurg,true
+GM-2026-000183,Dipali Nikam,Gram Library Road,Sangli,true
+GM-2026-000184,Harish Salve,Taluka Court Lane,Dhule,true
+GM-2026-000185,Rutuja Tambe,Fruit Market Marg,Ratnagiri,true
+GM-2026-000186,Girish Tandel,Fishing Harbor Road,Thane,true
+GM-2026-000187,Shalini Wani,Bazaar Samiti Ground,Jalgaon,true
+GM-2026-000188,Nilesh Misal,Sugar Mill Gate 1,Ahilyanagar,true
+GM-2026-000189,Vaishali Khude,Panchayat Samiti Layout,Beed,true
+GM-2026-000190,Rupesh Kambale,Police Outpost Road,Solapur,true
+GM-2026-000191,Snehal Kolhe,Primary School Lane,Amravati,true
+GM-2026-000192,Kishor Mahale,Tribal Settlement Block 4,Palghar,true
+GM-2026-000193,Monika Nagpure,Cotton Ginning Mill Road,Yavatmal,true
+GM-2026-000194,Pradeep Ogale,High School Ground,Satara,true
+GM-2026-000195,Sonali Paranjape,Brahmin Galli Village Junnar,Pune,true
+GM-2026-000196,Babu Rathod,Tanda Colony Block A,Nanded,true
+GM-2026-000197,Reshma Sayyad,Jamia Masjid Road,Chhatrapati Sambhajinagar,true
+GM-2026-000198,Devidas Shirke,Shivaji Statue Circle,Kolhapur,true
+GM-2026-000199,Varun Taskar,Engineering College Marg,Nagpur,true
+GM-2026-000200,Madhuri Ukirde,Water Filter Plant Road,Raigad,true
+GM-2026-000201,Pankaj Vaidya,Ayurvedic Hospital Lane,Nashik,true
+GM-2026-000202,Vandana Waykar,Grape Garden Colony,Nashik,true
+GM-2026-000203,Karan Yadav,Wrestling School Compound,Kolhapur,true
+GM-2026-000204,Bhakti Zope,Banana Market Road,Jalgaon,true
+GM-2026-000205,Santosh Ahire,Old Fort Gate,Dhule,true
+GM-2026-000206,Tejaswini Bhore,Lake View Road,Satara,true
+GM-2026-000207,Dattatray Chormale,Sugar Cane Loading Yard,Solapur,true
+GM-2026-000208,Manasi Diver,Sea Coast Lane,Ratnagiri,true
+GM-2026-000209,Siddharth Ekbote,Panchayat Sabha Bhavan,Pune,true
+GM-2026-000210,Namrata Falke,Cotton Market Gate,Wardha,true
+GM-2026-000211,Siddhesh Ghate,Subhash Chowk,Amravati,true
+GM-2026-000212,Smita Hire,Collectorate Bypass,Nashik,true
+GM-2026-000213,Tanmay Inamdar,Old Wada Road,Pune,true
+GM-2026-000214,Vrushali Juvale,Fisheries Office Road,Sindhudurg,true
+GM-2026-000215,Hemant Kature,Thermal Power Station Colony,Chandrapur,true
+GM-2026-000216,Chitra Lagad,Gram Vikas Kendra,Ahilyanagar,true
+GM-2026-000217,Narendra Mandlik,Zilla Parishad Guest House,Kolhapur,true
+GM-2026-000218,Sheetal Nimse,Handloom Weaver Colony,Solapur,true
+GM-2026-000219,Omkar Phatak,Sanskrit Pathshala Lane,Satara,true
+GM-2026-000220,Sayali Raste,Historical Fort Approach,Satara,true
+GM-2026-000221,Subodh Shrotri,Panchayat Library,Nagpur,true
+GM-2026-000222,Anagha Tipnis,Old Customs House Road,Raigad,true
+GM-2026-000223,Vishal Upadhye,Ganesh Temple Marg,Pune,true
+GM-2026-000224,Dhanashree Vichare,Sericulture Demonstration Center,Osmanabad,true

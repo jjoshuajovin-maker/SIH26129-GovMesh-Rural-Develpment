@@ -1,0 +1,746 @@
+# Build Request: GovMesh – Rural Development & Panchayat Raj Integration Module
+
+Develop a functional MVP prototype for **GovMesh**, an AI-powered government interoperability platform. The first department to be implemented is the **Rural Development & Panchayat Raj Department, Maharashtra**.
+
+## 1. Core Objective
+
+Build a citizen-facing application where a citizen can enter a natural-language government-service request.
+
+Use this primary demo query:
+
+> "I have shifted to a new address in Maharashtra. I want to update my address across my government records, including my Revenue records, ration card, and local Gram Panchayat records."
+
+The system must understand the citizen's intent using an AI/LLM layer and convert it into a structured service request.
+
+The LLM must NOT directly call government departments.
+
+Instead:
+
+Citizen Query → AI Intent Detection → Structured Intent → GovMesh Orchestrator → Service Registry → Workflow → Department Adapter → Department System
+
+---
+
+# 2. Department 1 – Rural Development & Panchayat Raj
+
+The first department integration must represent the **Rural Development & Panchayat Raj Department, Maharashtra**.
+
+The department module should conceptually handle:
+
+* Gram Panchayat records
+* Rural local-government records
+* Address-related record updates
+* Citizen/local-body service requests
+* Panchayat-level verification
+* Rural development service status
+
+The prototype should use a simulated/Mock Rural Development backend because real government APIs are not available.
+
+Do NOT claim that the prototype is connected to the real Maharashtra government systems.
+
+Clearly label the integration as:
+
+**"Rural Development – Mock Integration / Sandbox"**
+
+---
+
+# 3. Citizen Application
+
+Create a modern government-service citizen portal.
+
+The landing page should contain:
+
+### Header
+
+GovMesh
+
+"One Request. Multiple Departments. One Unified Experience."
+
+Navigation:
+
+* Home
+* Services
+* My Requests
+* Status
+* Help
+
+### Main section
+
+Heading:
+
+"How can we help you?"
+
+Large natural-language input box.
+
+Placeholder:
+
+"Describe the government service you need..."
+
+Pre-fill the demo query:
+
+"I have shifted to a new address in Maharashtra. I want to update my address across my government records, including my Revenue records, ration card, and local Gram Panchayat records."
+
+Button:
+
+**Analyze Request**
+
+---
+
+# 4. AI Intent Detection
+
+When the user clicks "Analyze Request", simulate an LLM response.
+
+Display:
+
+### AI Understanding
+
+Intent:
+
+**ADDRESS_CHANGE**
+
+Entities:
+
+* State: Maharashtra
+* Service: Government Record Address Update
+* Local Government: Gram Panchayat
+* Action: Address Change
+
+Suggested services:
+
+* Revenue Address Update
+* Ration Card Address Update
+* Gram Panchayat Address Update
+
+Show a confidence indicator such as:
+
+**Intent Confidence: 96%**
+
+Add a small explanation:
+
+"The request involves multiple government departments. GovMesh will coordinate the required services through an approved workflow."
+
+---
+
+# 5. GovMesh Orchestrator
+
+After intent detection, show a visual workflow.
+
+Architecture:
+
+Citizen
+↓
+AI / LLM
+↓
+Structured Intent
+↓
+GovMesh Orchestrator
+↓
+Service Registry
+↓
+Address Change Workflow
+↓
+Department Adapters
+↓
+Government Systems
+
+Create a dashboard card called:
+
+**GovMesh Orchestrator**
+
+Show:
+
+* Request ID
+* Detected Intent
+* Workflow
+* Departments Involved
+* Current Status
+* Consent Status
+
+Generate a request ID such as:
+
+GM-2026-000124
+
+---
+
+# 6. Consent Screen
+
+Do NOT automatically transmit citizen information.
+
+Before integration, display:
+
+## Review & Consent
+
+Request:
+
+**Address Change**
+
+Departments involved:
+
+✓ Revenue & Forest Department
+✓ Food & Civil Supplies Department
+✓ Rural Development & Panchayat Raj Department
+
+Information required:
+
+* Citizen Name
+* New Address
+* Mobile Number
+* Address Proof
+* Existing Government Record ID
+
+Purpose:
+
+"Update government records following change of address."
+
+Checkbox:
+
+"I understand and consent to sharing the above information with the selected government departments for processing this request."
+
+Button:
+
+**Give Consent & Continue**
+
+Button:
+
+**Cancel**
+
+The workflow must not proceed until consent is provided.
+
+---
+
+# 7. Canonical Data Model
+
+After consent, convert the citizen information into a common GovMesh format.
+
+Use a canonical JSON object similar to:
+
+{
+"application_id": "GM-2026-000124",
+"intent": "ADDRESS_CHANGE",
+"citizen": {
+"name": "Demo Citizen",
+"mobile": "XXXXXXXXXX",
+"address": "New Demo Address, Maharashtra"
+},
+"services": [
+"REVENUE_ADDRESS_UPDATE",
+"RATION_ADDRESS_UPDATE",
+"GRAM_PANCHAYAT_ADDRESS_UPDATE"
+],
+"consent_id": "CONSENT-00124",
+"timestamp": "2026-08-30T10:30:00"
+}
+
+Do not use real personal data.
+
+Use clearly marked demo data.
+
+---
+
+# 8. Rural Development Adapter
+
+Implement the Rural Development integration as a separate adapter.
+
+Architecture:
+
+GovMesh Core
+↓
+Rural Development Adapter
+↓
+Legacy Transformation Layer
+↓
+CSV Generator
+↓
+Mock SFTP/File Transfer
+↓
+Rural Development Mock System
+
+The adapter must translate the canonical GovMesh data into the format expected by the simulated legacy Rural Development system.
+
+Example CSV:
+
+application_id,citizen_name,address,verified,consent_id
+
+GM-2026-000124,Demo Citizen,"New Demo Address, Maharashtra",true,CONSENT-00124
+
+The application should generate this data programmatically rather than requiring manual file creation.
+
+---
+
+# 9. Mock Rural Development System
+
+Create a separate simulated department dashboard.
+
+Title:
+
+**Rural Development & Panchayat Raj Department**
+
+Subtitle:
+
+"Sandbox Integration – Maharashtra"
+
+Dashboard cards:
+
+* Pending Requests
+* Processing
+* Completed
+* Failed
+* Total Requests
+
+Create a request table:
+
+| Application ID | Citizen | Service | Status | Received |
+| -------------- | ------- | ------- | ------ | -------- |
+
+Example:
+
+GM-2026-000124 | Demo Citizen | Gram Panchayat Address Update | Processing | Today
+
+When GovMesh sends the request, the Rural Development mock system should receive and display it.
+
+Allow the department simulator to change the request status:
+
+* RECEIVED
+* VALIDATING
+* VERIFIED
+* COMPLETED
+* REJECTED
+
+The status must be returned to GovMesh.
+
+---
+
+# 10. Protocol Demonstration
+
+The prototype should visually demonstrate that GovMesh can communicate with systems using different technologies.
+
+For the three departments use:
+
+Revenue:
+REST / JSON
+
+Food & Civil Supplies:
+SOAP / XML
+
+Rural Development:
+CSV / SFTP
+
+These are simulated integrations for the MVP.
+
+Do not imply that these are the actual production interfaces of the Maharashtra government.
+
+Show a protocol badge beside each department:
+
+Revenue → REST / JSON
+
+Food → SOAP / XML
+
+Rural → CSV / SFTP
+
+---
+
+# 11. Workflow Status
+
+Create a unified request-status page.
+
+Example:
+
+## Address Update Request
+
+Application ID:
+
+GM-2026-000124
+
+### Department Processing
+
+Revenue & Forest
+🟢 Completed
+
+Food & Civil Supplies
+🟡 Processing
+
+Rural Development & Panchayat Raj
+🔵 Waiting
+
+Show a progress timeline:
+
+1. Request Submitted
+2. AI Intent Identified
+3. Consent Obtained
+4. Workflow Created
+5. Revenue Processing
+6. Food Processing
+7. Rural Development Processing
+8. Final Response
+
+---
+
+# 12. Failure & Retry Demonstration
+
+This is an important part of the prototype.
+
+Add a **Demo Failure** toggle/button.
+
+When enabled, simulate:
+
+Food & Civil Supplies
+→ FAILED / TEMPORARILY UNAVAILABLE
+
+Then demonstrate:
+
+Failure
+↓
+Exception Handler
+↓
+Message Queue
+↓
+Automatic Retry
+↓
+Food Department
+↓
+SUCCESS
+↓
+Continue Workflow
+↓
+Rural Development
+↓
+SUCCESS
+
+Use a simulated RabbitMQ/message-queue layer.
+
+The citizen should see:
+
+Revenue & Forest
+✓ Completed
+
+Food & Civil Supplies
+↻ Retrying
+
+Rural Development
+⏳ Waiting
+
+After retry:
+
+Food & Civil Supplies
+✓ Completed
+
+Rural Development
+✓ Completed
+
+Overall Request
+✓ COMPLETED
+
+---
+
+# 13. Audit Trail
+
+Create an audit section inside GovMesh.
+
+Display events such as:
+
+10:30:01 – Request received
+
+10:30:02 – AI intent detected
+
+10:30:03 – Address Change workflow selected
+
+10:30:04 – Consent received
+
+10:30:05 – Canonical data created
+
+10:30:06 – Revenue adapter invoked
+
+10:30:07 – Revenue response received
+
+10:30:08 – Food adapter invoked
+
+10:30:09 – Food service temporarily unavailable
+
+10:30:10 – Retry queued
+
+10:30:15 – Food service successful
+
+10:30:16 – Rural Development adapter invoked
+
+10:30:18 – Rural Development request received
+
+10:30:20 – Workflow completed
+
+Each event should contain:
+
+* Timestamp
+* Application ID
+* Service
+* Component
+* Status
+* Description
+
+---
+
+# 14. Service Registry
+
+Create a Service Registry screen.
+
+Example:
+
+SERVICE REGISTRY
+
+REVENUE_ADDRESS_UPDATE
+Department: Revenue & Forest
+Protocol: REST / JSON
+Status: Available
+
+RATION_ADDRESS_UPDATE
+Department: Food & Civil Supplies
+Protocol: SOAP / XML
+Status: Available
+
+GRAM_PANCHAYAT_ADDRESS_UPDATE
+Department: Rural Development & Panchayat Raj
+Protocol: CSV / SFTP
+Status: Available
+
+The registry should be used by the workflow engine rather than hard-coding department calls directly inside the AI layer.
+
+---
+
+# 15. Rural Development Service Workflow
+
+Implement this workflow:
+
+GRAM_PANCHAYAT_ADDRESS_UPDATE
+
+Input:
+Canonical GovMesh Citizen Data
+
+↓
+
+Validate Required Fields
+
+↓
+
+Validate Consent
+
+↓
+
+Generate Department Payload
+
+↓
+
+Convert JSON → CSV
+
+↓
+
+Transfer to Mock SFTP
+
+↓
+
+Rural Development Mock System
+
+↓
+
+Panchayat Record Validation
+
+↓
+
+Update Record
+
+↓
+
+Return Status
+
+↓
+
+GovMesh
+
+↓
+
+Citizen
+
+---
+
+# 16. Technical Architecture
+
+Build the application using a clean modular architecture.
+
+Recommended structure:
+
+Frontend
+↓
+API Gateway
+↓
+AI / Intent Service
+↓
+GovMesh Core
+├── Service Registry
+├── Workflow Orchestrator
+├── Consent Engine
+├── Canonical Data Model
+├── Schema Mapper
+├── Adapter Manager
+├── Exception Handler
+├── Audit Service
+└── Notification Service
+
+Adapters:
+
+├── Revenue Adapter
+├── Food Adapter
+└── Rural Development Adapter
+
+Infrastructure:
+
+├── Database
+├── Message Queue
+└── Mock SFTP
+
+Use mock services wherever real government APIs are unavailable.
+
+---
+
+# 17. Important UI Requirement
+
+The interface should look like a professional government technology platform, not a generic AI chatbot.
+
+Design principles:
+
+* Clean
+* Trustworthy
+* Accessible
+* Mobile responsive
+* Government-service oriented
+* Clear status indicators
+* Minimal unnecessary animation
+* Strong typography
+* Easy navigation
+
+Support:
+
+* English
+* Marathi
+
+Include accessibility controls:
+
+* Increase text size
+* High contrast
+* Accessible labels
+* Keyboard navigation
+
+---
+
+# 18. Demo Mode
+
+Add a clearly visible:
+
+**DEMO MODE**
+
+indicator.
+
+Create a demo-control panel where the presenter can:
+
+* Reset workflow
+* Trigger request
+* Simulate department success
+* Simulate department failure
+* Trigger retry
+* Complete Rural Development workflow
+* View audit logs
+
+This is required for a hackathon presentation.
+
+---
+
+# 19. Complete Demo Flow
+
+The final application must support this exact sequence:
+
+1. Citizen opens GovMesh.
+2. Citizen sees the natural-language service input.
+3. Demo query is entered.
+4. User clicks "Analyze Request".
+5. AI identifies ADDRESS_CHANGE.
+6. System identifies three required services.
+7. GovMesh creates the workflow.
+8. Citizen reviews the departments.
+9. Citizen gives consent.
+10. GovMesh creates canonical data.
+11. Revenue adapter processes REST/JSON.
+12. Food adapter processes SOAP/XML.
+13. Rural Development adapter converts canonical data to CSV.
+14. Mock SFTP transfer occurs.
+15. Rural Development mock system receives the request.
+16. Rural system validates the request.
+17. Rural system returns status.
+18. GovMesh aggregates all responses.
+19. Citizen sees one unified status.
+20. Demonstrate a temporary failure.
+21. GovMesh queues the failed operation.
+22. Automatic retry occurs.
+23. Workflow resumes.
+24. All departments eventually complete.
+25. Citizen receives final confirmation.
+
+---
+
+# 20. Final Success Screen
+
+Show:
+
+## Request Completed Successfully
+
+Application ID:
+
+**GM-2026-000124**
+
+Your address update request has been processed.
+
+✓ Revenue & Forest – Completed
+
+✓ Food & Civil Supplies – Completed
+
+✓ Rural Development & Panchayat Raj – Completed
+
+Overall Status:
+
+**COMPLETED**
+
+Also show:
+
+**"GovMesh coordinated multiple government services through a single citizen request."**
+
+---
+
+# 21. Development Requirements
+
+Build this as a fully functional local MVP rather than a static UI.
+
+Requirements:
+
+* Frontend with working navigation
+* Backend APIs
+* Database persistence
+* Mock government APIs/services
+* Workflow state management
+* Consent management
+* Service registry
+* Department adapters
+* Status tracking
+* Failure simulation
+* Retry mechanism
+* Audit logs
+* Demo controls
+
+Use environment variables for configuration.
+
+Keep all government integrations modular so real APIs can later replace the mock adapters without redesigning the core system.
+
+Prioritize a working end-to-end demonstration over unnecessary features.
+
+The most important feature is:
+
+**One citizen request → AI intent → GovMesh workflow → multiple department adapters → heterogeneous protocols → unified status.**
+
+Do not build the LLM as a direct government-system caller.
+
+The AI identifies intent.
+
+**GovMesh controls the workflow.**

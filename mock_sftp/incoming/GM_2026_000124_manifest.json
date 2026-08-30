@@ -1,0 +1,8 @@
+{
+  "application": "GM-2026-000124",
+  "consent": "CONSENT-00124",
+  "purpose": "Rural service record update",
+  "created": "2026-08-30T10:15:00Z",
+  "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "allowed_fields": ["citizen_name", "address", "district", "verified"]
+}
