@@ -164,7 +164,11 @@ router.post('/files/upload', (req, res) => {
   const newFileContent = `application_id,citizen_name,address,district,verified\n${appId},Demo Citizen,Gram Panchayat Ward No 2,Nashik,true`;
   const incomingPath = path.resolve(process.cwd(), 'mock_sftp/incoming', fileName);
 
-  fs.writeFileSync(incomingPath, newFileContent, 'utf-8');
+  try {
+    fs.writeFileSync(incomingPath, newFileContent, 'utf-8');
+  } catch (e) {
+    // Ignore read-only filesystem error on serverless environments
+  }
 
   const checksum = sftpSimulator.calculateStringChecksum(newFileContent);
 
