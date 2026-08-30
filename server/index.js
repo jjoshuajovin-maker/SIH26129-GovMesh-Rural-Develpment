@@ -1,32 +1,6 @@
-import express from 'express';
-import cors from 'cors';
-import path from 'path';
-import apiRouter from './routes/api.js';
+import app from './app.js';
 
-const app = express();
 const PORT = process.env.PORT || 5000;
-
-app.use(cors());
-app.use(express.json());
-
-// API Routes
-app.use('/api', apiRouter);
-
-// Serve static build in production mode if exists
-const distPath = path.resolve(process.cwd(), 'dist');
-app.use(express.static(distPath));
-
-app.get('*', (req, res, next) => {
-  if (req.url.startsWith('/api')) {
-    return next();
-  }
-  const indexPath = path.join(distPath, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    res.send('Rural Development & Panchayat Raj Department - API Server Running on Port 5000');
-  }
-});
 
 app.listen(PORT, () => {
   console.log(`============================================================`);

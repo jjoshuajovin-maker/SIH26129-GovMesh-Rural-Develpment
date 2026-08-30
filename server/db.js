@@ -1,8 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import os from 'os';
 
-const DB_FILE = path.resolve(process.cwd(), 'data_store.json');
+const IS_VERCEL = !!process.env.VERCEL;
+const DB_FILE = IS_VERCEL
+  ? path.join(os.tmpdir(), 'data_store.json')
+  : path.resolve(process.cwd(), 'data_store.json');
 
 // Initial seed data
 const initialData = {
@@ -169,7 +173,7 @@ const initialData = {
 
 class DataStore {
   constructor() {
-    this.data = initialData;
+    this.data = JSON.parse(JSON.stringify(initialData));
     this.init();
   }
 
@@ -182,8 +186,7 @@ class DataStore {
         this.save();
       }
     } catch (e) {
-      console.error('Error loading DB file, resetting to seed data:', e);
-      this.data = initialData;
+      this.data = JSON.parse(JSON.stringify(initialData));
       this.save();
     }
   }
@@ -192,7 +195,7 @@ class DataStore {
     try {
       fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
     } catch (e) {
-      console.error('Failed to save DB file:', e);
+      // In-memory data is updated even if write to filesystem fails on serverless environments
     }
   }
 
