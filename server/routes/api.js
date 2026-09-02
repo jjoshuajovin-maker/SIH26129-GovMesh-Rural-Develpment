@@ -403,80 +403,94 @@ router.get('/health', (req, res) => {
 // ------------------------------------------------------------
 // 6. GOVMESH INTEROPERABILITY & CANONICAL ADAPTER ENDPOINTS
 // ------------------------------------------------------------
-router.post(['/rural/address-update', '/govmesh/requests'], (req, res) => {
-  const demoControls = db.get('demoControls') || {};
-  if (demoControls.simulateSftpFailure) {
-    return res.status(503).json({
-      success: false,
+router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => {
+  try {
+    const demoControls = (await db.getDemoControls()) || {};
+    if (demoControls.simulateSftpFailure) {
+      return res.status(503).json({
+        success: false,
+        department: 'RURAL_DEVELOPMENT',
+        status: 'FAILED',
+        errorCode: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+        message: 'Rural Development server / SFTP connector is temporarily offline.'
+      });
+    }
+
+    const { applicationId, citizenId, consentId, citizen, serviceCode } = req.body || {};
+    const appId = applicationId || `GM-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    const citizenName = citizen?.name || req.body?.name || 'Demo Citizen';
+    const addressLine = citizen?.address?.line1 || citizen?.address?.line || req.body?.address?.line1 || 'Gram Panchayat Ward No. 4';
+    const district = citizen?.address?.district || req.body?.address?.district || 'Pune';
+
+    const records = (await db.getRecords()) || [];
+    let existing = records.find(r => r.applicationId === appId);
+
+    if (!existing) {
+      const newRecord = {
+        id: `REC-${Date.now()}`,
+        applicationId: appId,
+        citizenRef: citizenId || `CITIZEN-${Math.floor(100 + Math.random() * 900)}`,
+        citizenName,
+        address: addressLine,
+        district,
+        service: 'Local Rural Record Update',
+        receivedDate: new Date().toISOString(),
+        status: 'Completed',
+        lastUpdated: new Date().toISOString(),
+        consentId: consentId || `CONSENT-${Math.floor(10000 + Math.random() * 90000)}`,
+        verified: true
+      };
+      await db.addRecord(newRecord);
+      existing = newRecord;
+
+      await db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, newRecord.id, 'SYSTEM', 'SUCCESS');
+      await db.addAuditLog('RECORD_PROCESSED', appId, newRecord.id, 'OFFICER-001', 'SUCCESS');
+    }
+
+    res.status(200).json({
+      success: true,
       department: 'RURAL_DEVELOPMENT',
-      status: 'FAILED',
-      errorCode: 'SERVICE_TEMPORARILY_UNAVAILABLE',
-      message: 'Rural Development server / SFTP connector is temporarily offline.'
+      departmentApplicationId: existing.id,
+      applicationId: appId,
+      status: 'COMPLETED',
+      message: 'Local Gram Panchayat and Rural registry records synchronized successfully.',
+      record: existing
+    });
+  } catch (err) {
+    console.error('[Rural API Error]', err);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Rural Development processing error'
     });
   }
-
-  const { applicationId, citizenId, consentId, citizen, serviceCode } = req.body || {};
-  const appId = applicationId || `GM-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-  const citizenName = citizen?.name || req.body?.name || 'Demo Citizen';
-  const addressLine = citizen?.address?.line1 || citizen?.address?.line || req.body?.address?.line1 || 'Gram Panchayat Ward No. 4';
-  const district = citizen?.address?.district || req.body?.address?.district || 'Pune';
-
-  const records = db.get('records') || [];
-  let existing = records.find(r => r.applicationId === appId);
-
-  if (!existing) {
-    const newRecord = {
-      id: `REC-${Date.now()}`,
-      applicationId: appId,
-      citizenRef: citizenId || `CITIZEN-${Math.floor(100 + Math.random() * 900)}`,
-      citizenName,
-      address: addressLine,
-      district,
-      service: 'Local Rural Record Update',
-      receivedDate: new Date().toISOString(),
-      status: 'Completed',
-      lastUpdated: new Date().toISOString(),
-      consentId: consentId || `CONSENT-${Math.floor(10000 + Math.random() * 90000)}`,
-      verified: true
-    };
-    records.unshift(newRecord);
-    db.set('records', records);
-    existing = newRecord;
-
-    db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, newRecord.id, 'SYSTEM', 'SUCCESS');
-    db.addAuditLog('RECORD_PROCESSED', appId, newRecord.id, 'OFFICER-001', 'SUCCESS');
-  }
-
-  res.status(200).json({
-    success: true,
-    department: 'RURAL_DEVELOPMENT',
-    departmentApplicationId: existing.id,
-    applicationId: appId,
-    status: 'COMPLETED',
-    message: 'Local Gram Panchayat and Rural registry records synchronized successfully.',
-    record: existing
-  });
 });
 
-router.get(['/rural/application/:id', '/govmesh/requests/:id'], (req, res) => {
-  const { id } = req.params;
-  const records = db.get('records') || [];
-  const record = records.find(r => r.applicationId === id || r.id === id);
+router.get(['/rural/application/:id', '/govmesh/requests/:id'], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const records = (await db.getRecords()) || [];
+    const record = records.find(r => r.applicationId === id || r.id === id);
 
-  if (!record) {
-    return res.status(404).json({
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: `No rural development record found matching ID: ${id}`
+      });
+    }
+
+    res.json({
+      success: true,
+      applicationId: record.applicationId,
+      departmentApplicationId: record.id,
+      status: (record.status || 'COMPLETED').toUpperCase(),
+      record
+    });
+  } catch (err) {
+    res.status(500).json({
       success: false,
-      message: `No rural development record found matching ID: ${id}`
+      message: err.message
     });
   }
-
-  res.json({
-    success: true,
-    applicationId: record.applicationId,
-    departmentApplicationId: record.id,
-    status: record.status.toUpperCase(),
-    record
-  });
 });
 
 // ------------------------------------------------------------
