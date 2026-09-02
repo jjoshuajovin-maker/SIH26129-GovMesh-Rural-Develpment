@@ -9,8 +9,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Mount API Router on /api
-app.use('/api', apiRouter);
+// Mount API Router on both / and /api for full serverless compatibility
+app.use(['/', '/api'], apiRouter);
 
 // Serve static frontend build if dist folder exists
 const distPath = path.resolve(process.cwd(), 'dist');
