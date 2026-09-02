@@ -17,11 +17,10 @@ let activeSession = {
 // ------------------------------------------------------------
 // 1. AUTHENTICATION APIs
 // ------------------------------------------------------------
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', async (req, res) => {
   const { username, password, role, otp } = req.body;
 
-  // Simple demo auth check
-  const users = db.get('users');
+  const users = await db.getUsers();
   let user = users.find(u => u.username === username || u.role === role);
 
   if (!user) {
@@ -46,7 +45,7 @@ router.post('/auth/login', (req, res) => {
     expiresInMinutes: 15
   };
 
-  db.addAuditLog('OFFICER_LOGIN', 'N/A', 'N/A', user.name, 'SUCCESS');
+  await db.addAuditLog('OFFICER_LOGIN', 'N/A', 'N/A', user.name, 'SUCCESS');
 
   res.json({
     success: true,
@@ -55,9 +54,9 @@ router.post('/auth/login', (req, res) => {
   });
 });
 
-router.post('/auth/logout', (req, res) => {
+router.post('/auth/logout', async (req, res) => {
   if (activeSession.user) {
-    db.addAuditLog('OFFICER_LOGOUT', 'N/A', 'N/A', activeSession.user.name, 'SUCCESS');
+    await db.addAuditLog('OFFICER_LOGOUT', 'N/A', 'N/A', activeSession.user.name, 'SUCCESS');
   }
   activeSession = { user: null, loginTime: null, expiresInMinutes: 15 };
   res.json({ success: true, message: 'Logged out successfully' });
@@ -73,13 +72,13 @@ router.get('/auth/me', (req, res) => {
 // ------------------------------------------------------------
 // 2. DASHBOARD & SYSTEM MONITORING APIs
 // ------------------------------------------------------------
-router.get('/dashboard', (req, res) => {
-  const files = db.get('files') || [];
-  const records = db.get('records') || [];
-  const exceptions = db.get('exceptions') || [];
-  const transfers = db.get('transfers') || [];
-  const systemHealth = db.get('systemHealth');
-  const demoControls = db.get('demoControls');
+router.get('/dashboard', async (req, res) => {
+  const files = await db.getFiles();
+  const records = await db.getRecords();
+  const exceptions = await db.getExceptions();
+  const transfers = await db.getTransfers();
+  const systemHealth = await db.getSystemHealth();
+  const demoControls = await db.getDemoControls();
 
   const filesReceivedToday = files.length + 6;
   const recordsImported = 124;
@@ -116,35 +115,26 @@ router.get('/dashboard', (req, res) => {
 // ------------------------------------------------------------
 // 3. FILE INGESTION & MANAGEMENT APIs
 // ------------------------------------------------------------
-router.get('/files', (req, res) => {
-  const files = db.get('files') || [];
+router.get('/files', async (req, res) => {
+  const files = await db.getFiles();
   res.json(files);
 });
 
-router.get('/files/:id', (req, res) => {
+router.get('/files/:id', async (req, res) => {
   const { id } = req.params;
-  const files = db.get('files') || [];
+  const files = await db.getFiles();
   const file = files.find(f => f.id === id || f.fileName === id);
 
   if (!file) {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  // Load CSV content from mock_sftp
-  const incomingPath = path.resolve(process.cwd(), 'mock_sftp/incoming', file.fileName);
-  let parsedCsv = { headers: [], rows: [], raw: '' };
-  
-  if (fs.existsSync(incomingPath)) {
-    parsedCsv = sftpSimulator.readCSV(incomingPath);
+  let parsedCsv;
+  if (file.csvContent) {
+    parsedCsv = sftpSimulator.parseCSVString(file.csvContent);
   } else {
-    // Return sample rows
-    parsedCsv = {
-      headers: ['application_id', 'citizen_name', 'address', 'district', 'verified'],
-      rows: [
-        { application_id: file.applicationId, citizen_name: 'Demo Citizen', address: 'Demo Address, Gram Panchayat Ward 4', district: 'Pune', verified: 'true' }
-      ],
-      raw: `application_id,citizen_name,address,district,verified\n${file.applicationId},Demo Citizen,"Demo Address, Gram Panchayat Ward 4",Pune,true`
-    };
+    const incomingPath = path.resolve(process.cwd(), 'mock_sftp/incoming', file.fileName);
+    parsedCsv = sftpSimulator.readCSV(incomingPath);
   }
 
   res.json({
@@ -153,23 +143,12 @@ router.get('/files/:id', (req, res) => {
   });
 });
 
-router.post('/files/upload', (req, res) => {
-  const demoControls = db.get('demoControls');
-  const files = db.get('files');
-
+router.post('/files/upload', async (req, res) => {
   const fileId = `FILE-${Math.floor(100000 + Math.random() * 900000)}`;
   const appId = `GM-2026-${Math.floor(100000 + Math.random() * 900000)}`;
   const fileName = `GM_2026_${Math.floor(100000 + Math.random() * 900000)}.csv`;
 
   const newFileContent = `application_id,citizen_name,address,district,verified\n${appId},Demo Citizen,Gram Panchayat Ward No 2,Nashik,true`;
-  const incomingPath = path.resolve(process.cwd(), 'mock_sftp/incoming', fileName);
-
-  try {
-    fs.writeFileSync(incomingPath, newFileContent, 'utf-8');
-  } catch (e) {
-    // Ignore read-only filesystem error on serverless environments
-  }
-
   const checksum = sftpSimulator.calculateStringChecksum(newFileContent);
 
   const newFile = {
@@ -194,13 +173,12 @@ router.post('/files/upload', (req, res) => {
       created: new Date().toISOString(),
       checksum,
       allowedFields: ['citizen_name', 'address', 'district', 'verified']
-    }
+    },
+    csvContent: newFileContent
   };
 
-  files.unshift(newFile);
-  db.set('files', files);
-
-  db.addAuditLog('FILE_RECEIVED', appId, fileId, 'SYSTEM', 'SUCCESS', checksum);
+  await db.addFile(newFile);
+  await db.addAuditLog('FILE_RECEIVED', appId, fileId, 'SYSTEM', 'SUCCESS', checksum);
 
   res.json({
     success: true,
@@ -208,35 +186,29 @@ router.post('/files/upload', (req, res) => {
   });
 });
 
-router.post('/files/:id/validate', (req, res) => {
+router.post('/files/:id/validate', async (req, res) => {
   const { id } = req.params;
-  const files = db.get('files');
-  const fileIndex = files.findIndex(f => f.id === id || f.fileName === id);
+  const files = await db.getFiles();
+  const file = files.find(f => f.id === id || f.fileName === id);
 
-  if (fileIndex === -1) {
+  if (!file) {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  const file = files[fileIndex];
-  const incomingPath = path.resolve(process.cwd(), 'mock_sftp/incoming', file.fileName);
-
   let parsedCsv;
-  if (fs.existsSync(incomingPath)) {
-    parsedCsv = sftpSimulator.readCSV(incomingPath);
+  if (file.csvContent) {
+    parsedCsv = sftpSimulator.parseCSVString(file.csvContent);
   } else {
-    parsedCsv = {
-      headers: ['application_id', 'citizen_name', 'address', 'district', 'verified'],
-      rows: [{ application_id: file.applicationId, citizen_name: 'Demo Citizen', address: 'Demo Address', district: 'Pune', verified: 'true' }]
-    };
+    const incomingPath = path.resolve(process.cwd(), 'mock_sftp/incoming', file.fileName);
+    parsedCsv = sftpSimulator.readCSV(incomingPath);
   }
 
   const validationResult = validationEngine.validateFileSchema(parsedCsv, file.checksum, files);
 
-  file.status = validationResult.valid ? 'VALIDATING' : 'INVALID';
-  files[fileIndex] = file;
-  db.set('files', files);
+  const newStatus = validationResult.valid ? 'VALIDATING' : 'INVALID';
+  await db.updateFileStatus(file.id, newStatus);
 
-  db.addAuditLog('VALIDATION_COMPLETED', file.applicationId, file.id, 'SYSTEM', validationResult.valid ? 'SUCCESS' : 'FAILED', file.checksum);
+  await db.addAuditLog('VALIDATION_COMPLETED', file.applicationId, file.id, 'SYSTEM', validationResult.valid ? 'SUCCESS' : 'FAILED', file.checksum);
 
   res.json({
     fileId: file.id,
@@ -245,21 +217,18 @@ router.post('/files/:id/validate', (req, res) => {
   });
 });
 
-router.post('/files/:id/process', (req, res) => {
+router.post('/files/:id/process', async (req, res) => {
   const { id } = req.params;
-  const files = db.get('files');
-  const fileIndex = files.findIndex(f => f.id === id || f.fileName === id);
+  const files = await db.getFiles();
+  const file = files.find(f => f.id === id || f.fileName === id);
 
-  if (fileIndex === -1) {
+  if (!file) {
     return res.status(404).json({ error: 'File not found' });
   }
 
-  const file = files[fileIndex];
+  await db.updateFileStatus(file.id, 'PROCESSED');
   file.status = 'PROCESSED';
-  files[fileIndex] = file;
-  db.set('files', files);
 
-  // Generate batch records summary
   const isBatch = file.recordsCount > 1;
   const batchSummary = {
     fileId: file.id,
@@ -272,7 +241,7 @@ router.post('/files/:id/process', (req, res) => {
     status: 'COMPLETED'
   };
 
-  db.addAuditLog('RECORD_PROCESSED', file.applicationId, file.id, 'OFFICER-001', 'SUCCESS', file.checksum);
+  await db.addAuditLog('RECORD_PROCESSED', file.applicationId, file.id, 'OFFICER-001', 'SUCCESS', file.checksum);
 
   res.json({
     success: true,
@@ -281,10 +250,9 @@ router.post('/files/:id/process', (req, res) => {
   });
 });
 
-router.post('/files/:id/generate-result', (req, res) => {
+router.post('/files/:id/generate-result', async (req, res) => {
   const { id } = req.params;
-  const files = db.get('files');
-  const file = files.find(f => f.id === id || f.fileName === id);
+  const file = await db.getFile(id);
 
   if (!file) {
     return res.status(404).json({ error: 'File not found' });
@@ -302,7 +270,7 @@ router.post('/files/:id/generate-result', (req, res) => {
 
   const resultFileInfo = sftpSimulator.generateResultCSV(file.fileName, batchResults);
 
-  db.addAuditLog('RESULT_FILE_GENERATED', file.applicationId, file.id, 'SYSTEM', 'SUCCESS', file.checksum);
+  await db.addAuditLog('RESULT_FILE_GENERATED', file.applicationId, file.id, 'SYSTEM', 'SUCCESS', file.checksum);
 
   res.json({
     success: true,
@@ -312,12 +280,11 @@ router.post('/files/:id/generate-result', (req, res) => {
   });
 });
 
-router.post('/files/:id/send-to-govmesh', (req, res) => {
+router.post('/files/:id/send-to-govmesh', async (req, res) => {
   const { id } = req.params;
-  const files = db.get('files');
-  const file = files.find(f => f.id === id || f.fileName === id);
+  const file = await db.getFile(id);
 
-  db.addAuditLog('SENT_TO_GOVMESH', file ? file.applicationId : 'GM-2026-000124', id, 'SYSTEM', 'SUCCESS');
+  await db.addAuditLog('SENT_TO_GOVMESH', file ? file.applicationId : 'GM-2026-000124', id, 'SYSTEM', 'SUCCESS');
 
   res.json({
     success: true,
@@ -329,31 +296,21 @@ router.post('/files/:id/send-to-govmesh', (req, res) => {
 // ------------------------------------------------------------
 // 4. EXCEPTION QUEUE & OFFICER REVIEW APIs
 // ------------------------------------------------------------
-router.get('/exceptions', (req, res) => {
-  const exceptions = db.get('exceptions') || [];
+router.get('/exceptions', async (req, res) => {
+  const exceptions = await db.getExceptions();
   res.json(exceptions);
 });
 
-router.post('/exceptions/:id/correct', (req, res) => {
+router.post('/exceptions/:id/correct', async (req, res) => {
   const { id } = req.params;
   const { district, address } = req.body;
-  const exceptions = db.get('exceptions');
-  const excIndex = exceptions.findIndex(e => e.id === id);
+  const exc = await db.correctException(id, district, address);
 
-  if (excIndex === -1) {
+  if (!exc) {
     return res.status(404).json({ error: 'Exception record not found' });
   }
 
-  const exc = exceptions[excIndex];
-  if (district) exc.district = district;
-  if (address) exc.address = address;
-  exc.status = 'Corrected';
-  exc.lastUpdated = new Date().toISOString();
-
-  exceptions[excIndex] = exc;
-  db.set('exceptions', exceptions);
-
-  db.addAuditLog('CORRECTION_RECORDED', exc.applicationId, exc.fileId, 'OFFICER-001', 'SUCCESS');
+  await db.addAuditLog('CORRECTION_RECORDED', exc.applicationId, exc.fileId, 'OFFICER-001', 'SUCCESS');
 
   res.json({
     success: true,
@@ -362,23 +319,15 @@ router.post('/exceptions/:id/correct', (req, res) => {
   });
 });
 
-router.post('/exceptions/:id/reprocess', (req, res) => {
+router.post('/exceptions/:id/reprocess', async (req, res) => {
   const { id } = req.params;
-  const exceptions = db.get('exceptions');
-  const excIndex = exceptions.findIndex(e => e.id === id);
+  const exc = await db.reprocessException(id);
 
-  if (excIndex === -1) {
+  if (!exc) {
     return res.status(404).json({ error: 'Exception record not found' });
   }
 
-  const exc = exceptions[excIndex];
-  exc.status = 'Resolved';
-  exceptions[excIndex] = exc;
-  db.set('exceptions', exceptions);
-
-  // Add to processed service records
-  const records = db.get('records');
-  records.push({
+  const newRecord = {
     id: `REC-${Date.now()}`,
     applicationId: exc.applicationId,
     citizenRef: `CITIZEN-${Math.floor(100 + Math.random() * 900)}`,
@@ -386,15 +335,15 @@ router.post('/exceptions/:id/reprocess', (req, res) => {
     address: exc.address || 'Gram Panchayat Road',
     district: exc.district || 'Pune',
     service: 'Local Rural Record Update',
-    receivedDate: exc.created,
+    receivedDate: exc.created || new Date().toISOString(),
     status: 'Completed',
     lastUpdated: new Date().toISOString(),
     consentId: exc.consentId || 'CONSENT-00125',
     verified: true
-  });
-  db.set('records', records);
+  };
+  await db.addRecord(newRecord);
 
-  db.addAuditLog('REPROCESS_SUCCESS', exc.applicationId, exc.fileId, 'OFFICER-001', 'SUCCESS');
+  await db.addAuditLog('REPROCESS_SUCCESS', exc.applicationId, exc.fileId, 'OFFICER-001', 'SUCCESS');
 
   res.json({
     success: true,
@@ -406,29 +355,20 @@ router.post('/exceptions/:id/reprocess', (req, res) => {
 // ------------------------------------------------------------
 // 5. FAILED TRANSFERS & AUDIT LOGS
 // ------------------------------------------------------------
-router.get('/transfers/failed', (req, res) => {
-  const transfers = db.get('transfers') || [];
+router.get('/transfers/failed', async (req, res) => {
+  const transfers = await db.getTransfers();
   res.json(transfers);
 });
 
-router.post('/transfers/:id/retry', (req, res) => {
+router.post('/transfers/:id/retry', async (req, res) => {
   const { id } = req.params;
-  const transfers = db.get('transfers');
-  const tIndex = transfers.findIndex(t => t.id === id);
+  const transfer = await db.retryTransfer(id);
 
-  if (tIndex === -1) {
+  if (!transfer) {
     return res.status(404).json({ error: 'Transfer task not found' });
   }
 
-  const transfer = transfers[tIndex];
-  transfer.retryAttempts = (transfer.retryAttempts || 1) + 1;
-  transfer.status = 'SUCCESS';
-  transfer.reason = 'Retry successful after connection re-established';
-
-  transfers[tIndex] = transfer;
-  db.set('transfers', transfers);
-
-  db.addAuditLog('TRANSFER_RETRY_SUCCESS', transfer.fileName, transfer.id, 'SYSTEM', 'SUCCESS');
+  await db.addAuditLog('TRANSFER_RETRY_SUCCESS', transfer.fileName, transfer.id, 'SYSTEM', 'SUCCESS');
 
   res.json({
     success: true,
@@ -437,34 +377,29 @@ router.post('/transfers/:id/retry', (req, res) => {
   });
 });
 
-router.get('/records', (req, res) => {
-  const records = db.get('records') || [];
+router.get('/records', async (req, res) => {
+  const records = await db.getRecords();
   res.json(records);
 });
 
-router.get('/audit', (req, res) => {
-  const auditLogs = db.get('auditLogs') || [];
+router.get('/audit', async (req, res) => {
+  const auditLogs = await db.getAuditLogs();
   res.json(auditLogs);
 });
 
-router.get('/system-health', (req, res) => {
-  const systemHealth = db.get('systemHealth');
+router.get('/system-health', async (req, res) => {
+  const systemHealth = await db.getSystemHealth();
   res.json(systemHealth);
 });
 
 // ------------------------------------------------------------
 // 6. DEMO FAILURE CONTROLS & RESET
 // ------------------------------------------------------------
-router.post('/demo/failure', (req, res) => {
+router.post('/demo/failure', async (req, res) => {
   const { type, enabled } = req.body;
-  const demoControls = db.get('demoControls') || {};
+  const demoControls = await db.toggleDemoControl(type, enabled);
 
-  if (type) {
-    demoControls[type] = enabled !== undefined ? enabled : !demoControls[type];
-  }
-  db.set('demoControls', demoControls);
-
-  db.addAuditLog('DEMO_FAILURE_INJECTED', 'N/A', 'N/A', 'PRESENTER', `INJECTED_${type}`);
+  await db.addAuditLog('DEMO_FAILURE_INJECTED', 'N/A', 'N/A', 'PRESENTER', `INJECTED_${type}`);
 
   res.json({
     success: true,
@@ -472,9 +407,9 @@ router.post('/demo/failure', (req, res) => {
   });
 });
 
-router.post('/demo/reset', (req, res) => {
-  const resetData = db.resetDemo();
-  db.addAuditLog('DEMO_ENVIRONMENT_RESET', 'ALL', 'ALL', 'PRESENTER', 'SUCCESS');
+router.post('/demo/reset', async (req, res) => {
+  const resetData = await db.resetDemo();
+  await db.addAuditLog('DEMO_ENVIRONMENT_RESET', 'ALL', 'ALL', 'PRESENTER', 'SUCCESS');
   res.json({
     success: true,
     message: 'Demo environment reset to initial clean state',

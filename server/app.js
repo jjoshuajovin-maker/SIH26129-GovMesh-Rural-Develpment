@@ -9,10 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// API Router
+// Mount API Router on /api
 app.use('/api', apiRouter);
 
-// Fallback for non-API routes if served from Express
+// Serve static frontend build if dist folder exists
 const distPath = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
