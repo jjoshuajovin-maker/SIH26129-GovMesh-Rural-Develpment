@@ -258,7 +258,35 @@ npm run dev
 
 ---
 
-### 17. Future Scope
+### 17. GovMesh Cloud Interoperability & Deployment
+
+The Rural Development backend is deployed as a serverless microservice on Vercel, providing cloud-to-cloud interoperability with the GovMesh Core backend without requiring local servers.
+
+* **Production URL**: `https://sih-26129-gov-mesh-rural-develpment.vercel.app`
+* **Health Endpoint**: `GET https://sih-26129-gov-mesh-rural-develpment.vercel.app/api/health`
+* **Interoperability Ingress**: `POST https://sih-26129-gov-mesh-rural-develpment.vercel.app/api/rural/address-update`
+* **Application Status**: `GET https://sih-26129-gov-mesh-rural-develpment.vercel.app/api/rural/application/:id`
+
+#### Deployment Topology
+```
+GovMesh Core Backend (Port 5000 / Cloud Host)
+       │
+       ▼ (Server-to-Server HTTPS)
+Rural Development Adapter
+       │
+       ▼ (POST /api/rural/address-update)
+https://sih-26129-gov-mesh-rural-develpment.vercel.app
+       │
+       ▼
+Vercel Serverless Function (/api/index.js -> server/app.js)
+       │
+       ▼
+Rural Development Validation Engine & Datastore (PostgreSQL / In-Memory)
+```
+
+---
+
+### 18. Future Scope
 
 * **Production SFTP Connector**: Integration with enterprise OpenSSH / AWS Transfer SFTP servers.
 * **Digital Signatures**: X.509 PKI digital signatures for CSV file manifests.
