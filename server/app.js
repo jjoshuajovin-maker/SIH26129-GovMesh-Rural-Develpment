@@ -9,8 +9,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Mount API Router on both / and /api for full serverless compatibility
-app.use(['/', '/api'], apiRouter);
+// URL normalization middleware for Vercel serverless and standalone Express
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api/')) {
+    req.url = req.url.substring(4);
+  } else if (req.url === '/api') {
+    req.url = '/';
+  }
+  next();
+});
+
+app.use('/', apiRouter);
 
 // Serve static frontend build if dist folder exists
 const distPath = path.resolve(process.cwd(), 'dist');
