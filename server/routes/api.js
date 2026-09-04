@@ -393,18 +393,19 @@ router.get('/system-health', async (req, res) => {
   res.json(systemHealth);
 });
 
-router.get(['/health', '/rural/health', '/api/rural/health'], (req, res) => {
+router.get(['/health', '/rural/health', '/api/rural/health', '/api/health'], (req, res) => {
   res.status(200).json({
-    success: true,
+    status: 'UP',
     service: 'RURAL_DEVELOPMENT',
-    status: 'UP'
+    environment: process.env.NODE_ENV || 'production',
+    version: process.env.DEPLOYMENT_VERSION || '1.0.0-realtime-v2'
   });
 });
 
 // ------------------------------------------------------------
 // 6. GOVMESH INTEROPERABILITY & CANONICAL ADAPTER ENDPOINTS
 // ------------------------------------------------------------
-router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => {
+router.post(['/rural/address-update', '/api/rural/address-update', '/govmesh/requests'], async (req, res) => {
   try {
     const correlationId = req.headers['x-correlation-id'] ||
                           req.headers['x-govmesh-correlation-id'] ||
@@ -478,10 +479,13 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
       });
     }
 
-    console.log(`[RURAL] Incoming application received applicationId=${appId} correlationId=${correlationId}`);
+    console.log(`[RURAL] Request validated applicationId=${appId}`);
+    console.log(`[RURAL] Application ID verified applicationId=${appId}`);
 
     // Idempotency check
     const existing = await db.getRecordByAppIdOrDeptId(appId);
+    console.log(`[RURAL] Duplicate check completed applicationId=${appId}`);
+
     if (existing) {
       console.log(`[RURAL] Application already received applicationId=${appId} status=${existing.status}`);
       return res.status(200).json({
@@ -527,10 +531,11 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
 
     await db.addRecord(newRecord);
 
-    console.log(`[RURAL] Application persisted applicationId=${appId} departmentApplicationId=${departmentApplicationId} status=RECEIVED`);
-    await db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS');
+    console.log(`[RURAL] Application persisted applicationId=${appId} departmentApplicationId=${departmentApplicationId}`);
+    console.log(`[RURAL] Status set to RECEIVED applicationId=${appId}`);
+    console.log(`[RURAL] Application available to dashboard applicationId=${appId}`);
 
-    // NO automatic setTimeout progression!
+    await db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS');
 
     return res.status(202).json({
       success: true,
