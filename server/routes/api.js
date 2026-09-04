@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { db } from '../db.js';
 import { sftpSimulator } from '../sftpSimulator.js';
 import { validationEngine } from '../validationEngine.js';
@@ -392,11 +393,11 @@ router.get('/system-health', async (req, res) => {
   res.json(systemHealth);
 });
 
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'rural-development-department',
-    environment: process.env.NODE_ENV || 'production'
+router.get(['/health', '/rural/health', '/api/rural/health'], (req, res) => {
+  res.status(200).json({
+    success: true,
+    service: 'RURAL_DEVELOPMENT',
+    status: 'UP'
   });
 });
 
@@ -405,62 +406,167 @@ router.get('/health', (req, res) => {
 // ------------------------------------------------------------
 router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => {
   try {
+    const correlationId = req.headers['x-correlation-id'] ||
+                          req.headers['x-govmesh-correlation-id'] ||
+                          req.body?.correlationId ||
+                          `CORR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    res.setHeader('X-Correlation-ID', correlationId);
+
     const demoControls = (await db.getDemoControls()) || {};
     if (demoControls.simulateSftpFailure) {
       return res.status(503).json({
         success: false,
         department: 'RURAL_DEVELOPMENT',
         status: 'FAILED',
-        errorCode: 'SERVICE_TEMPORARILY_UNAVAILABLE',
-        message: 'Rural Development server / SFTP connector is temporarily offline.'
+        error: {
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+          message: 'Rural Development server / SFTP connector is temporarily offline.'
+        },
+        correlationId
       });
     }
 
-    const { applicationId, citizenId, consentId, citizen, serviceCode } = req.body || {};
-    const appId = applicationId || `GM-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-    const citizenName = citizen?.name || req.body?.name || 'Demo Citizen';
-    const addressLine = citizen?.address?.line1 || citizen?.address?.line || req.body?.address?.line1 || 'Gram Panchayat Ward No. 4';
-    const district = citizen?.address?.district || req.body?.address?.district || 'Pune';
-
-    const records = (await db.getRecords()) || [];
-    let existing = records.find(r => r.applicationId === appId);
-
-    if (!existing) {
-      const newRecord = {
-        id: `REC-${Date.now()}`,
-        applicationId: appId,
-        citizenRef: citizenId || `CITIZEN-${Math.floor(100 + Math.random() * 900)}`,
-        citizenName,
-        address: addressLine,
-        district,
-        service: 'Local Rural Record Update',
-        receivedDate: new Date().toISOString(),
-        status: 'Completed',
-        lastUpdated: new Date().toISOString(),
-        consentId: consentId || `CONSENT-${Math.floor(10000 + Math.random() * 90000)}`,
-        verified: true
-      };
-      await db.addRecord(newRecord);
-      existing = newRecord;
-
-      await db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, newRecord.id, 'SYSTEM', 'SUCCESS');
-      await db.addAuditLog('RECORD_PROCESSED', appId, newRecord.id, 'OFFICER-001', 'SUCCESS');
+    // Optional Request Hash verification (if secret configured)
+    const requestHash = req.headers['x-govmesh-request-hash'];
+    const hashSecret = process.env.GOVMESH_REQUEST_HASH_SECRET || process.env.GOVMESH_SECRET;
+    if (requestHash && hashSecret) {
+      const computedHash = crypto.createHmac('sha256', hashSecret).update(JSON.stringify(req.body)).digest('hex');
+      if (computedHash !== requestHash) {
+        console.error(`[RURAL] Invalid request hash. Expected ${computedHash}, got ${requestHash}`);
+        return res.status(400).json({
+          success: false,
+          status: 'REJECTED',
+          error: {
+            code: 'INVALID_REQUEST_HASH',
+            message: 'Request payload hash verification failed'
+          },
+          correlationId
+        });
+      }
     }
 
-    res.status(200).json({
+    const { applicationId, citizenId: topCitizenId, name: topName, address: topAddress, citizen } = req.body || {};
+
+    const appId = applicationId;
+    const citizenId = topCitizenId || citizen?.id || citizen?.citizenId;
+    const citizenName = topName || citizen?.name;
+    const addressObj = topAddress || citizen?.address;
+    const line1 = addressObj?.line1 || addressObj?.line;
+    const district = addressObj?.district;
+    const state = addressObj?.state;
+
+    // Strict validation requirement
+    const missingFields = [];
+    if (!appId || typeof appId !== 'string' || !appId.trim()) missingFields.push('applicationId');
+    if (!citizenId || typeof citizenId !== 'string' || !citizenId.trim()) missingFields.push('citizenId');
+    if (!citizenName || typeof citizenName !== 'string' || !citizenName.trim()) missingFields.push('name');
+    if (!line1 || typeof line1 !== 'string' || !line1.trim()) missingFields.push('address.line1');
+    if (!district || typeof district !== 'string' || !district.trim()) missingFields.push('address.district');
+    if (!state || typeof state !== 'string' || !state.trim()) missingFields.push('address.state');
+
+    if (missingFields.length > 0) {
+      console.log(`[RURAL] Request validation failed. Missing: ${missingFields.join(', ')} applicationId=${appId || 'N/A'} correlationId=${correlationId}`);
+      return res.status(400).json({
+        success: false,
+        status: 'REJECTED',
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Missing required field(s): ${missingFields.join(', ')}`
+        },
+        applicationId: appId || null,
+        correlationId
+      });
+    }
+
+    console.log(`[RURAL] Request received applicationId=${appId} correlationId=${correlationId}`);
+
+    // Idempotency check
+    const existing = await db.getRecordByAppIdOrDeptId(appId);
+    if (existing) {
+      console.log(`[RURAL] Application already received applicationId=${appId} status=${existing.status}`);
+      return res.status(200).json({
+        success: true,
+        department: 'RURAL_DEVELOPMENT',
+        departmentApplicationId: existing.departmentApplicationId || existing.id,
+        applicationId: existing.applicationId,
+        status: existing.status || 'RECEIVED',
+        message: 'Application already received',
+        correlationId
+      });
+    }
+
+    const deptAppSuffix = appId.includes('-') ? appId.split('-').slice(1).join('-') : appId;
+    const departmentApplicationId = `RURAL-${deptAppSuffix}`;
+    const now = new Date().toISOString();
+
+    const formattedAddress = typeof addressObj === 'string'
+      ? addressObj
+      : `${line1}${addressObj?.line2 ? ', ' + addressObj.line2 : ''}${addressObj?.city ? ', ' + addressObj.city : ''}, ${district}, ${state}${addressObj?.pincode ? ' - ' + addressObj.pincode : ''}`.trim();
+
+    const newRecord = {
+      id: departmentApplicationId,
+      departmentApplicationId,
+      applicationId: appId,
+      citizenRef: citizenId,
+      citizenId,
+      citizenName,
+      address: formattedAddress,
+      district,
+      state,
+      service: 'Local Rural Record Update',
+      receivedDate: now,
+      receivedAt: now,
+      status: 'RECEIVED',
+      lastUpdated: now,
+      updatedAt: now,
+      consentId: req.body?.consentId || `CONSENT-${Date.now()}`,
+      verified: true,
+      correlationId
+    };
+
+    await db.addRecord(newRecord);
+
+    console.log(`[RURAL] Application persisted applicationId=${appId} departmentApplicationId=${departmentApplicationId} status=RECEIVED`);
+    await db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS');
+
+    // Async lifecycle progression: RECEIVED -> PROCESSING -> COMPLETED
+    setTimeout(async () => {
+      try {
+        console.log(`[RURAL] Application processing applicationId=${appId}`);
+        await db.updateRecordStatus(appId, 'PROCESSING');
+        await db.addAuditLog('RECORD_PROCESSING', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS');
+
+        setTimeout(async () => {
+          console.log(`[RURAL] Application completed applicationId=${appId}`);
+          await db.updateRecordStatus(appId, 'COMPLETED');
+          await db.addAuditLog('RECORD_PROCESSED', appId, departmentApplicationId, 'OFFICER-001', 'SUCCESS');
+        }, 1500);
+      } catch (e) {
+        console.error(`[RURAL] Application processing failed applicationId=${appId} correlationId=${correlationId}`, e);
+        await db.updateRecordStatus(appId, 'FAILED');
+      }
+    }, 500);
+
+    return res.status(202).json({
       success: true,
       department: 'RURAL_DEVELOPMENT',
-      departmentApplicationId: existing.id,
       applicationId: appId,
-      status: 'COMPLETED',
-      message: 'Local Gram Panchayat and Rural registry records synchronized successfully.',
-      record: existing
+      departmentApplicationId,
+      status: 'RECEIVED',
+      message: 'Request received successfully',
+      correlationId
     });
   } catch (err) {
-    console.error('[Rural API Error]', err);
-    res.status(500).json({
+    console.error(`[RURAL] Application processing error`, err);
+    return res.status(500).json({
       success: false,
-      message: err.message || 'Rural Development processing error'
+      status: 'FAILED',
+      error: {
+        code: 'INTERNAL_PROCESSING_ERROR',
+        message: 'Unable to process application'
+      },
+      applicationId: req.body?.applicationId || null
     });
   }
 });
@@ -468,27 +574,46 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
 router.get(['/rural/application/:id', '/govmesh/requests/:id'], async (req, res) => {
   try {
     const { id } = req.params;
-    const records = (await db.getRecords()) || [];
-    const record = records.find(r => r.applicationId === id || r.id === id);
+    const correlationId = req.headers['x-correlation-id'] || req.headers['x-govmesh-correlation-id'];
+    if (correlationId) {
+      res.setHeader('X-Correlation-ID', correlationId);
+    }
+
+    const record = await db.getRecordByAppIdOrDeptId(id);
 
     if (!record) {
       return res.status(404).json({
         success: false,
-        message: `No rural development record found matching ID: ${id}`
+        status: 'FAILED',
+        error: {
+          code: 'NOT_FOUND',
+          message: `No application found matching ID: ${id}`
+        }
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
-      applicationId: record.applicationId,
-      departmentApplicationId: record.id,
-      status: (record.status || 'COMPLETED').toUpperCase(),
+      application: {
+        applicationId: record.applicationId,
+        departmentApplicationId: record.departmentApplicationId || record.id,
+        department: 'RURAL_DEVELOPMENT',
+        status: record.status || 'COMPLETED',
+        correlationId: record.correlationId || correlationId || 'N/A',
+        receivedAt: record.receivedAt || record.receivedDate,
+        updatedAt: record.updatedAt || record.lastUpdated
+      },
       record
     });
   } catch (err) {
+    console.error(`[RURAL] Status lookup error`, err);
     res.status(500).json({
       success: false,
-      message: err.message
+      status: 'FAILED',
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: err.message
+      }
     });
   }
 });

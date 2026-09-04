@@ -68,17 +68,22 @@ const initialFiles = [
 const initialRecords = [
   {
     id: 'REC-001',
+    departmentApplicationId: 'RURAL-000124',
     applicationId: 'GM-2026-000124',
     citizenRef: 'CITIZEN-001',
     citizenName: 'Demo Citizen',
     address: 'Gram Panchayat Ward No. 4, Village Khed',
     district: 'Pune',
+    state: 'Maharashtra',
     service: 'Local Rural Record Update',
     receivedDate: '2026-08-30T10:15:00.000Z',
-    status: 'Completed',
+    receivedAt: '2026-08-30T10:15:00.000Z',
+    status: 'COMPLETED',
     lastUpdated: '2026-08-30T10:15:00.000Z',
+    updatedAt: '2026-08-30T10:15:00.000Z',
     consentId: 'CONSENT-00124',
-    verified: true
+    verified: true,
+    correlationId: 'CORR-000124'
   }
 ];
 
@@ -409,12 +414,32 @@ class DataStore {
         await this.pool.query(
           `INSERT INTO records (id, application_id, citizen_ref, citizen_name, address, district, service, received_date, status, last_updated, consent_id, verified)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [recordObj.id, recordObj.applicationId, recordObj.citizenRef, recordObj.citizenName, recordObj.address, recordObj.district, recordObj.service, recordObj.receivedDate, recordObj.status, recordObj.lastUpdated, recordObj.consentId, recordObj.verified]
+          [recordObj.id, recordObj.applicationId, recordObj.citizenRef, recordObj.citizenName, typeof recordObj.address === 'object' ? JSON.stringify(recordObj.address) : recordObj.address, recordObj.district, recordObj.service, recordObj.receivedDate || recordObj.receivedAt, recordObj.status, recordObj.lastUpdated || recordObj.updatedAt, recordObj.consentId, recordObj.verified]
         );
       } catch (e) { console.error('PG error:', e); }
     }
     this.memory.records.push(recordObj);
     return recordObj;
+  }
+
+  async getRecordByAppIdOrDeptId(id) {
+    const records = await this.getRecords();
+    return records.find(r => r.applicationId === id || r.departmentApplicationId === id || r.id === id);
+  }
+
+  async updateRecordStatus(appIdOrDeptId, status) {
+    const record = await this.getRecordByAppIdOrDeptId(appIdOrDeptId);
+    if (record) {
+      record.status = status;
+      record.lastUpdated = new Date().toISOString();
+      record.updatedAt = record.lastUpdated;
+      if (this.usePostgres && this.pool) {
+        try {
+          await this.pool.query('UPDATE records SET status = $1, last_updated = $2 WHERE id = $3 OR application_id = $3', [status, record.lastUpdated, appIdOrDeptId]);
+        } catch (e) { console.error('PG error:', e); }
+      }
+    }
+    return record;
   }
 
   async getExceptions() {

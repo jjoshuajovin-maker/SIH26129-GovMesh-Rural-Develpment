@@ -6,7 +6,11 @@ import apiRouter from './routes/api.js';
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-GovMesh-App-ID', 'X-GovMesh-Request-Hash', 'X-GovMesh-Sent-At'],
+  exposedHeaders: ['X-Correlation-ID', 'X-GovMesh-App-ID', 'X-GovMesh-Request-Hash', 'X-GovMesh-Sent-At']
+}));
 app.use(express.json());
 
 // URL normalization middleware for Vercel serverless and standalone Express
