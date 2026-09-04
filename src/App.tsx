@@ -146,6 +146,10 @@ export function App() {
 
   useEffect(() => {
     refreshAll();
+    const interval = setInterval(() => {
+      refreshAll();
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   // Handlers

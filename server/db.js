@@ -67,10 +67,18 @@ class DataStore {
     }
   }
 
+  getStoreFilePath() {
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+      return path.resolve('/tmp', 'data_store.json');
+    }
+    return STORE_FILE;
+  }
+
   loadFromFile() {
     try {
-      if (fs.existsSync(STORE_FILE)) {
-        const content = fs.readFileSync(STORE_FILE, 'utf8');
+      const filePath = this.getStoreFilePath();
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
         const loaded = JSON.parse(content);
         if (loaded) {
           if (Array.isArray(loaded.records)) this.memory.records = loaded.records;
@@ -81,7 +89,7 @@ class DataStore {
         }
       }
     } catch (e) {
-      console.error('Error loading data_store.json:', e);
+      console.error('Error loading data store file:', e);
     }
   }
 
@@ -94,9 +102,23 @@ class DataStore {
         exceptions: this.memory.exceptions,
         transfers: this.memory.transfers
       };
-      fs.writeFileSync(STORE_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
+      const filePath = this.getStoreFilePath();
+      fs.writeFileSync(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
     } catch (e) {
-      console.error('Error saving data_store.json:', e);
+      try {
+        // Fallback to /tmp if primary path fails due to EROFS
+        const fallbackPath = path.resolve('/tmp', 'data_store.json');
+        const dataToSave = {
+          records: this.memory.records,
+          auditLogs: this.memory.auditLogs,
+          files: this.memory.files,
+          exceptions: this.memory.exceptions,
+          transfers: this.memory.transfers
+        };
+        fs.writeFileSync(fallbackPath, JSON.stringify(dataToSave, null, 2), 'utf8');
+      } catch (err) {
+        console.error('Error saving data store file:', err);
+      }
     }
   }
 

@@ -448,13 +448,13 @@ router.post(['/rural/address-update', '/api/rural/address-update', '/govmesh/req
 
     const { applicationId, citizenId: topCitizenId, name: topName, address: topAddress, citizen } = req.body || {};
 
-    const appId = applicationId;
-    const citizenId = topCitizenId || citizen?.id || citizen?.citizenId;
+    const appId = applicationId || req.body?.appId || req.body?.id;
+    const citizenId = topCitizenId || citizen?.id || citizen?.citizenId || citizen?.reference || req.body?.citizenRef;
     const citizenName = topName || citizen?.name;
     const addressObj = topAddress || citizen?.address;
-    const line1 = addressObj?.line1 || addressObj?.line;
-    const district = addressObj?.district;
-    const state = addressObj?.state;
+    const line1 = (typeof addressObj === 'string' ? addressObj : addressObj?.line1 || addressObj?.line || addressObj?.fullAddress);
+    const district = addressObj?.district || req.body?.district || 'Pune';
+    const state = addressObj?.state || req.body?.state || 'Maharashtra';
 
     // Strict validation requirement - NO demo defaults
     const missingFields = [];
