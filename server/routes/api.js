@@ -84,9 +84,9 @@ router.get('/dashboard', async (req, res) => {
   const demoControls = await db.getDemoControls();
 
   const filesReceivedToday = files.length + govmeshReqs.length;
-  const recordsImported = records.length + 120;
+  const recordsImported = records.length;
   const pendingApplications = govmeshReqs.filter(r => r.status === 'RECEIVED' || r.status === 'VALIDATING' || r.status === 'ACCEPTED').length + exceptions.filter(e => e.status === 'Pending').length;
-  const processingCount = govmeshReqs.filter(r => r.status === 'PROCESSING').length + 7;
+  const processingCount = govmeshReqs.filter(r => r.status === 'PROCESSING').length;
   const completedCount = govmeshReqs.filter(r => r.status === 'COMPLETED').length + records.filter(r => r.status === 'Completed').length;
   const rejectedCount = govmeshReqs.filter(r => r.status === 'REJECTED').length;
   const invalidRecordsCount = exceptions.length;

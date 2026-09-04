@@ -93,9 +93,17 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
                   <td className="p-3 font-sans text-slate-600 truncate max-w-[200px]">{rec.address}</td>
                   <td className="p-3 text-slate-500">{new Date(rec.receivedDate).toLocaleDateString()}</td>
                   <td className="p-3">
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center">
-                      <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
-                      Completed
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center ${
+                      (rec.status === 'Completed' || rec.status === 'COMPLETED')
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : (rec.status === 'PROCESSING' || rec.status === 'In Progress')
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      <CheckCircle2 className={`w-3 h-3 mr-1 ${
+                        (rec.status === 'Completed' || rec.status === 'COMPLETED') ? 'text-emerald-600' : 'text-amber-600'
+                      }`} />
+                      {rec.status || 'Received'}
                     </span>
                   </td>
                 </tr>
