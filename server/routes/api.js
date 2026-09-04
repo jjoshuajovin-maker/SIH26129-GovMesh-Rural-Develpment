@@ -81,12 +81,12 @@ router.get('/dashboard', async (req, res) => {
   const systemHealth = await db.getSystemHealth();
   const demoControls = await db.getDemoControls();
 
-  const filesReceivedToday = files.length + 6;
-  const recordsImported = 124;
-  const pendingApplications = exceptions.filter(e => e.status === 'Pending').length + 8;
-  const processingCount = 7;
-  const completedCount = 96;
-  const rejectedCount = 4;
+  const filesReceivedToday = files.length;
+  const recordsImported = records.length;
+  const pendingApplications = records.filter(r => r.status === 'RECEIVED' || r.status === 'UNDER_REVIEW').length;
+  const processingCount = records.filter(r => r.status === 'UNDER_REVIEW').length;
+  const completedCount = records.filter(r => r.status === 'APPROVED' || r.status === 'COMPLETED').length;
+  const rejectedCount = records.filter(r => r.status === 'REJECTED' || r.status === 'FAILED').length;
   const invalidRecordsCount = exceptions.length;
   const failedTransfersCount = transfers.filter(t => t.status === 'FAILED').length;
 
@@ -104,9 +104,9 @@ router.get('/dashboard', async (req, res) => {
     legacyConnector: {
       status: demoControls?.simulateSftpFailure ? 'OFFLINE / ERROR' : 'ONLINE',
       type: 'SFTP / CSV File Connector',
-      lastTransfer: '10:18 AM',
-      lastFile: files[0]?.fileName || 'GM_2026_000124.csv',
-      pendingFiles: 2
+      lastTransfer: records[0]?.receivedDate || 'N/A',
+      lastFile: files[0]?.fileName || 'N/A',
+      pendingFiles: 0
     },
     systemHealth,
     demoControls
@@ -427,7 +427,6 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
       });
     }
 
-    // Optional Request Hash verification (if secret configured)
     const requestHash = req.headers['x-govmesh-request-hash'];
     const hashSecret = process.env.GOVMESH_REQUEST_HASH_SECRET || process.env.GOVMESH_SECRET;
     if (requestHash && hashSecret) {
@@ -456,7 +455,7 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
     const district = addressObj?.district;
     const state = addressObj?.state;
 
-    // Strict validation requirement
+    // Strict validation requirement - NO demo defaults
     const missingFields = [];
     if (!appId || typeof appId !== 'string' || !appId.trim()) missingFields.push('applicationId');
     if (!citizenId || typeof citizenId !== 'string' || !citizenId.trim()) missingFields.push('citizenId');
@@ -471,15 +470,15 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
         success: false,
         status: 'REJECTED',
         error: {
-          code: 'VALIDATION_ERROR',
-          message: `Missing required field(s): ${missingFields.join(', ')}`
+          code: 'INVALID_REQUEST',
+          message: `Required field is missing: ${missingFields.join(', ')}`
         },
         applicationId: appId || null,
         correlationId
       });
     }
 
-    console.log(`[RURAL] Request received applicationId=${appId} correlationId=${correlationId}`);
+    console.log(`[RURAL] Incoming application received applicationId=${appId} correlationId=${correlationId}`);
 
     // Idempotency check
     const existing = await db.getRecordByAppIdOrDeptId(appId);
@@ -512,6 +511,7 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
       citizenId,
       citizenName,
       address: formattedAddress,
+      addressObj: typeof addressObj === 'object' ? addressObj : { line1: formattedAddress, district, state },
       district,
       state,
       service: 'Local Rural Record Update',
@@ -530,23 +530,7 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
     console.log(`[RURAL] Application persisted applicationId=${appId} departmentApplicationId=${departmentApplicationId} status=RECEIVED`);
     await db.addAuditLog('GOVMESH_TRANSACTION_RECEIVED', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS');
 
-    // Async lifecycle progression: RECEIVED -> PROCESSING -> COMPLETED
-    setTimeout(async () => {
-      try {
-        console.log(`[RURAL] Application processing applicationId=${appId}`);
-        await db.updateRecordStatus(appId, 'PROCESSING');
-        await db.addAuditLog('RECORD_PROCESSING', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS');
-
-        setTimeout(async () => {
-          console.log(`[RURAL] Application completed applicationId=${appId}`);
-          await db.updateRecordStatus(appId, 'COMPLETED');
-          await db.addAuditLog('RECORD_PROCESSED', appId, departmentApplicationId, 'OFFICER-001', 'SUCCESS');
-        }, 1500);
-      } catch (e) {
-        console.error(`[RURAL] Application processing failed applicationId=${appId} correlationId=${correlationId}`, e);
-        await db.updateRecordStatus(appId, 'FAILED');
-      }
-    }, 500);
+    // NO automatic setTimeout progression!
 
     return res.status(202).json({
       success: true,
@@ -554,7 +538,7 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
       applicationId: appId,
       departmentApplicationId,
       status: 'RECEIVED',
-      message: 'Request received successfully',
+      message: 'Application received and queued for officer review',
       correlationId
     });
   } catch (err) {
@@ -571,6 +555,22 @@ router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => 
   }
 });
 
+// GET /api/rural/applications
+router.get('/rural/applications', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const records = await db.getRecords(status ? String(status) : null);
+    res.json({
+      success: true,
+      count: records.length,
+      applications: records
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/rural/application/:id
 router.get(['/rural/application/:id', '/govmesh/requests/:id'], async (req, res) => {
   try {
     const { id } = req.params;
@@ -597,11 +597,15 @@ router.get(['/rural/application/:id', '/govmesh/requests/:id'], async (req, res)
       application: {
         applicationId: record.applicationId,
         departmentApplicationId: record.departmentApplicationId || record.id,
+        citizenId: record.citizenId || record.citizenRef,
+        name: record.citizenName,
+        address: typeof record.addressObj === 'object' ? record.addressObj : { line1: record.address, district: record.district, state: record.state || 'Maharashtra' },
         department: 'RURAL_DEVELOPMENT',
-        status: record.status || 'COMPLETED',
+        status: record.status || 'RECEIVED',
         correlationId: record.correlationId || correlationId || 'N/A',
         receivedAt: record.receivedAt || record.receivedDate,
-        updatedAt: record.updatedAt || record.lastUpdated
+        updatedAt: record.updatedAt || record.lastUpdated,
+        rejectionReason: record.rejectionReason || null
       },
       record
     });
@@ -618,9 +622,93 @@ router.get(['/rural/application/:id', '/govmesh/requests/:id'], async (req, res)
   }
 });
 
-// ------------------------------------------------------------
-// 7. DEMO FAILURE CONTROLS & RESET
-// ------------------------------------------------------------
+// POST /api/rural/application/:id/review
+router.post('/rural/application/:id/review', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const officerId = req.body?.officerId || 'OFFICER-001';
+    const record = await db.reviewRecord(id, officerId);
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Application not found: ${id}` } });
+    }
+
+    await db.addAuditLog('OFFICER_REVIEW_STARTED', record.applicationId, record.departmentApplicationId || record.id, officerId, 'SUCCESS');
+
+    res.json({
+      success: true,
+      department: 'RURAL_DEVELOPMENT',
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status,
+      message: 'Application placed under officer review'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_ACTION', message: err.message } });
+  }
+});
+
+// POST /api/rural/application/:id/approve
+router.post('/rural/application/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const officerId = req.body?.officerId || 'OFFICER-001';
+    const record = await db.approveRecord(id, officerId);
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Application not found: ${id}` } });
+    }
+
+    await db.addAuditLog('OFFICER_APPROVED', record.applicationId, record.departmentApplicationId || record.id, officerId, 'SUCCESS');
+
+    res.json({
+      success: true,
+      department: 'RURAL_DEVELOPMENT',
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status,
+      message: 'Application approved successfully by officer'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_ACTION', message: err.message } });
+  }
+});
+
+// POST /api/rural/application/:id/reject
+router.post('/rural/application/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, officerId } = req.body || {};
+
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_REASON', message: 'Rejection reason is required' }
+      });
+    }
+
+    const record = await db.rejectRecord(id, officerId || 'OFFICER-001', reason);
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Application not found: ${id}` } });
+    }
+
+    await db.addAuditLog('OFFICER_REJECTED', record.applicationId, record.departmentApplicationId || record.id, officerId || 'OFFICER-001', 'REJECTED');
+
+    res.json({
+      success: true,
+      department: 'RURAL_DEVELOPMENT',
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status,
+      reason,
+      message: 'Application rejected by officer'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_ACTION', message: err.message } });
+  }
+});
+
 router.post('/demo/failure', async (req, res) => {
   const { type, enabled } = req.body;
   const demoControls = await db.toggleDemoControl(type, enabled);

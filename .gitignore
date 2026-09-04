@@ -15,6 +15,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+data_store.json
 
 # Dependency directories
 node_modules/

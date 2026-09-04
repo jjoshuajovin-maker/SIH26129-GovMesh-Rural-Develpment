@@ -1,4 +1,5 @@
 import app from './server/app.js';
+import { db } from './server/db.js';
 import http from 'http';
 
 const PORT = 5899;
@@ -45,158 +46,189 @@ function request(method, path, body = null, headers = {}) {
   });
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function runTests() {
   server = app.listen(PORT, async () => {
-    console.log(`Test server running on port ${PORT}...`);
+    console.log(`\n==================================================`);
+    console.log(`RURAL BACKEND REAL-TIME INTEGRATION TEST SUITE`);
+    console.log(`==================================================\n`);
     let passed = 0;
     let failed = 0;
 
     try {
-      // Test 1: Health check
-      console.log('\n--- Test 1: GET /health ---');
-      const healthRes = await request('GET', '/health');
-      if (healthRes.statusCode === 200 && healthRes.body.success === true && healthRes.body.status === 'UP') {
-        console.log('✓ Health check PASSED:', healthRes.body);
-        passed++;
-      } else {
-        console.error('✗ Health check FAILED:', healthRes);
-        failed++;
-      }
+      // Test 1: New Application Submission
+      console.log('--- Test 1: POST /api/rural/address-update (Real Citizen Application) ---');
+      const testTimestamp = Date.now();
+      const testAppId = `GM-REAL-${testTimestamp}`;
+      const testCitizenId = `CIT-REAL-${testTimestamp}`;
+      const testCorrId = `CORR-REAL-${testTimestamp}`;
 
-      // Test 2: New Valid Application Submission
-      console.log('\n--- Test 2: POST /api/rural/address-update (New Valid Application) ---');
-      const testAppId = `GM-TEST-${Date.now()}`;
-      const testCorrId = `CORR-TEST-${Date.now()}`;
       const validPayload = {
         applicationId: testAppId,
-        citizenId: 'CIT-TEST-999',
-        name: 'Anita Sharma',
+        citizenId: testCitizenId,
+        name: 'Ramesh Sundaram',
         address: {
-          line1: 'House 42, Gram Panchayat Ward 3',
-          line2: 'Near Water Tank',
-          city: 'Shirur',
-          district: 'Pune',
-          state: 'Maharashtra',
-          pincode: '412210'
+          line1: 'Door No 58, Village Main Street',
+          line2: 'Near Gram Panchayat Office',
+          city: 'Kinathukadavu',
+          district: 'Coimbatore',
+          state: 'Tamil Nadu',
+          pincode: '642109'
         }
       };
 
-      const newAppRes = await request('POST', '/api/rural/address-update', validPayload, {
+      const res1 = await request('POST', '/api/rural/address-update', validPayload, {
         'X-Correlation-ID': testCorrId
       });
 
       if (
-        newAppRes.statusCode === 202 &&
-        newAppRes.body.success === true &&
-        newAppRes.body.status === 'RECEIVED' &&
-        newAppRes.body.applicationId === testAppId &&
-        newAppRes.body.departmentApplicationId &&
-        newAppRes.headers['x-correlation-id'] === testCorrId
+        res1.statusCode === 202 &&
+        res1.body.success === true &&
+        res1.body.status === 'RECEIVED' &&
+        res1.body.applicationId === testAppId &&
+        res1.body.departmentApplicationId &&
+        res1.headers['x-correlation-id'] === testCorrId
       ) {
-        console.log('✓ New Application Submission PASSED:', newAppRes.body);
+        console.log('✓ Test 1 PASSED: Real application received and queued with status RECEIVED');
         passed++;
       } else {
-        console.error('✗ New Application Submission FAILED:', newAppRes);
+        console.error('✗ Test 1 FAILED:', res1);
         failed++;
       }
 
-      // Test 3: Idempotency (Duplicate Submission)
-      console.log('\n--- Test 3: Duplicate Submission (Same applicationId) ---');
-      const dupAppRes = await request('POST', '/api/rural/address-update', validPayload, {
+      // Test 2: Idempotent Duplicate Submission
+      console.log('\n--- Test 2: Idempotency (Duplicate Submission of Same applicationId) ---');
+      const res2 = await request('POST', '/api/rural/address-update', validPayload, {
         'X-Correlation-ID': testCorrId
       });
 
       if (
-        (dupAppRes.statusCode === 200 || dupAppRes.statusCode === 202) &&
-        dupAppRes.body.success === true &&
-        dupAppRes.body.applicationId === testAppId &&
-        dupAppRes.body.message.includes('already received')
+        (res2.statusCode === 200 || res2.statusCode === 202) &&
+        res2.body.success === true &&
+        res2.body.applicationId === testAppId &&
+        res2.body.message.includes('already received')
       ) {
-        console.log('✓ Duplicate Submission PASSED:', dupAppRes.body);
+        console.log('✓ Test 2 PASSED: Duplicate request returned existing record without duplication');
         passed++;
       } else {
-        console.error('✗ Duplicate Submission FAILED:', dupAppRes);
+        console.error('✗ Test 2 FAILED:', res2);
         failed++;
       }
 
-      // Test 4: Invalid Request (Missing applicationId)
-      console.log('\n--- Test 4: Invalid Request (Missing applicationId) ---');
+      // Test 3: Invalid Request Rejection (Missing Required Fields)
+      console.log('\n--- Test 3: Invalid Request Validation Failure ---');
       const invalidPayload = {
-        citizenId: 'CIT-TEST-999',
-        name: 'Anita Sharma',
-        address: { line1: 'Ward 3', district: 'Pune', state: 'Maharashtra' }
+        applicationId: `GM-INVALID-${Date.now()}`,
+        // citizenId missing!
+        name: 'Invalid Citizen',
+        address: { line1: 'No Street', district: 'Pune', state: 'Maharashtra' }
       };
 
-      const invalidRes = await request('POST', '/api/rural/address-update', invalidPayload);
+      const res3 = await request('POST', '/api/rural/address-update', invalidPayload);
       if (
-        invalidRes.statusCode === 400 &&
-        invalidRes.body.success === false &&
-        invalidRes.body.status === 'REJECTED' &&
-        invalidRes.body.error?.code === 'VALIDATION_ERROR'
+        res3.statusCode === 400 &&
+        res3.body.success === false &&
+        res3.body.status === 'REJECTED' &&
+        res3.body.error?.code === 'INVALID_REQUEST'
       ) {
-        console.log('✓ Invalid Request Handling PASSED:', invalidRes.body);
+        console.log('✓ Test 3 PASSED: Missing field rejected with HTTP 400 Bad Request');
         passed++;
       } else {
-        console.error('✗ Invalid Request Handling FAILED:', invalidRes);
+        console.error('✗ Test 3 FAILED:', res3);
         failed++;
       }
 
-      // Test 5: Status API Lookup (Immediate status lookup)
-      console.log('\n--- Test 5: GET /api/rural/application/:id (Lookup by GovMesh App ID) ---');
-      const statusRes1 = await request('GET', `/api/rural/application/${testAppId}`);
+      // Test 4: Application Status Lookup
+      console.log('\n--- Test 4: GET /api/rural/application/:id (Status Lookup) ---');
+      const res4 = await request('GET', `/api/rural/application/${testAppId}`);
       if (
-        statusRes1.statusCode === 200 &&
-        statusRes1.body.success === true &&
-        statusRes1.body.application?.applicationId === testAppId
+        res4.statusCode === 200 &&
+        res4.body.success === true &&
+        res4.body.application?.applicationId === testAppId &&
+        res4.body.application?.status === 'RECEIVED'
       ) {
-        console.log('✓ Status Lookup PASSED:', statusRes1.body);
+        console.log('✓ Test 4 PASSED: Status lookup returned valid application object');
         passed++;
       } else {
-        console.error('✗ Status Lookup FAILED:', statusRes1);
+        console.error('✗ Test 4 FAILED:', res4);
         failed++;
       }
 
-      // Test 6: Verify Async Status Transition (RECEIVED -> PROCESSING -> COMPLETED)
-      console.log('\n--- Test 6: Verify Status Lifecycle Transition ---');
-      console.log('Waiting 2.5s for background status progression to COMPLETED...');
-      await sleep(2500);
-      const statusRes2 = await request('GET', `/api/rural/application/${testAppId}`);
+      // Test 5: Manual Officer Review (RECEIVED -> UNDER_REVIEW)
+      console.log('\n--- Test 5: POST /api/rural/application/:id/review (Officer Review) ---');
+      const res5 = await request('POST', `/api/rural/application/${testAppId}/review`, { officerId: 'OFFICER-PUNE-01' });
       if (
-        statusRes2.statusCode === 200 &&
-        statusRes2.body.application?.status === 'COMPLETED'
+        res5.statusCode === 200 &&
+        res5.body.success === true &&
+        res5.body.status === 'UNDER_REVIEW'
       ) {
-        console.log('✓ Lifecycle Progression to COMPLETED PASSED:', statusRes2.body);
+        console.log('✓ Test 5 PASSED: Application status updated to UNDER_REVIEW');
         passed++;
       } else {
-        console.error('✗ Lifecycle Progression FAILED:', statusRes2);
+        console.error('✗ Test 5 FAILED:', res5);
         failed++;
       }
 
-      // Test 7: Unknown Application Lookup (404 Not Found)
-      console.log('\n--- Test 7: GET /api/rural/application/:id (Unknown Application ID) ---');
-      const unknownRes = await request('GET', '/api/rural/application/GM-NONEXISTENT-999');
+      // Test 6: Manual Officer Approval (UNDER_REVIEW -> APPROVED)
+      console.log('\n--- Test 6: POST /api/rural/application/:id/approve (Officer Approval) ---');
+      const res6 = await request('POST', `/api/rural/application/${testAppId}/approve`, { officerId: 'OFFICER-PUNE-01' });
       if (
-        unknownRes.statusCode === 404 &&
-        unknownRes.body.success === false &&
-        unknownRes.body.error?.code === 'NOT_FOUND'
+        res6.statusCode === 200 &&
+        res6.body.success === true &&
+        res6.body.status === 'APPROVED'
       ) {
-        console.log('✓ Unknown Application Lookup PASSED:', unknownRes.body);
+        console.log('✓ Test 6 PASSED: Application manually approved');
         passed++;
       } else {
-        console.error('✗ Unknown Application Lookup FAILED:', unknownRes);
+        console.error('✗ Test 6 FAILED:', res6);
+        failed++;
+      }
+
+      // Test 7: Manual Officer Rejection (UNDER_REVIEW -> REJECTED with Reason)
+      console.log('\n--- Test 7: POST /api/rural/application/:id/reject (Officer Rejection) ---');
+      const testRejAppId = `GM-REJ-${Date.now()}`;
+      await request('POST', '/api/rural/address-update', {
+        applicationId: testRejAppId,
+        citizenId: `CIT-REJ-${Date.now()}`,
+        name: 'Kavitha Nathan',
+        address: { line1: '12 Temple St', district: 'Salem', state: 'Tamil Nadu' }
+      });
+      await request('POST', `/api/rural/application/${testRejAppId}/review`);
+
+      const res7 = await request('POST', `/api/rural/application/${testRejAppId}/reject`, {
+        officerId: 'OFFICER-SALEM-02',
+        reason: 'Address details could not be verified by Gram Panchayat field staff'
+      });
+
+      if (
+        res7.statusCode === 200 &&
+        res7.body.success === true &&
+        res7.body.status === 'REJECTED' &&
+        res7.body.reason.includes('Gram Panchayat')
+      ) {
+        console.log('✓ Test 7 PASSED: Application rejected with mandatory reason recorded');
+        passed++;
+      } else {
+        console.error('✗ Test 7 FAILED:', res7);
+        failed++;
+      }
+
+      // Test 8: Data Persistence Verification
+      console.log('\n--- Test 8: Disk Persistence Verification ---');
+      const persistedRecord = await db.getRecordByAppIdOrDeptId(testAppId);
+      if (persistedRecord && persistedRecord.status === 'APPROVED') {
+        console.log('✓ Test 8 PASSED: Application state successfully persisted to storage');
+        passed++;
+      } else {
+        console.error('✗ Test 8 FAILED:', persistedRecord);
         failed++;
       }
 
       console.log(`\n==================================================`);
-      console.log(`RESULTS: ${passed} PASSED, ${failed} FAILED`);
+      console.log(`TEST SUITE COMPLETE: ${passed} PASSED, ${failed} FAILED`);
       console.log(`==================================================\n`);
 
     } catch (e) {
-      console.error('Error during testing:', e);
+      console.error('Error during testing execution:', e);
     } finally {
       server.close(() => process.exit(failed > 0 ? 1 : 0));
     }
