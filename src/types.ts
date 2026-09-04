@@ -107,6 +107,45 @@ export interface AuditLog {
   checksum: string;
 }
 
+export interface GovMeshRequest {
+  id: string;
+  applicationId: string;
+  correlationId: string;
+  requestVersion: number;
+  requestType: string;
+  serviceCode: string;
+  sourceDepartment: string;
+  targetDepartment: string;
+  citizenRef: string;
+  citizenName: string;
+  requestedAddress: string;
+  currentAddress: string;
+  district: string;
+  taluka: string;
+  state: string;
+  pincode: string;
+  consentId: string;
+  canonicalRequestHash: string;
+  documentHash: string;
+  hashStatus: string;
+  documentId?: string;
+  documentName?: string;
+  documentType?: string;
+  documentSize?: string;
+  acknowledgementId: string;
+  status: 'RECEIVED' | 'VALIDATING' | 'ACCEPTED' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
+  createdAt: string;
+  sentAt: string;
+  receivedAt: string;
+  validatedAt?: string | null;
+  acceptedAt?: string | null;
+  processingStartedAt?: string | null;
+  completedAt?: string | null;
+  officerRemarks?: string;
+  reviewedBy?: string;
+  rawSourceJson?: string;
+}
+
 export interface DemoControls {
   simulateSftpFailure: boolean;
   simulateCorruptedFile: boolean;

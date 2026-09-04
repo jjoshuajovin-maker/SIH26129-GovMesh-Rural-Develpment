@@ -1,7 +1,4 @@
 import crypto from 'crypto';
-import pg from 'pg';
-
-const { Pool } = pg;
 
 // Initial seed data
 const initialUsers = [
@@ -79,6 +76,54 @@ const initialRecords = [
     lastUpdated: '2026-08-30T10:15:00.000Z',
     consentId: 'CONSENT-00124',
     verified: true
+  }
+];
+
+const initialGovMeshRequests = [
+  {
+    id: 'RURAL-REQ-000124',
+    applicationId: 'GM-2026-000124',
+    correlationId: 'CORR-26-000124',
+    requestVersion: 1,
+    requestType: 'ADDRESS_CHANGE',
+    serviceCode: 'ADDRESS_CHANGE',
+    sourceDepartment: 'Revenue & Forest Department',
+    targetDepartment: 'Rural Development & Panchayat Raj',
+    citizenRef: 'GM-CIT-10001',
+    citizenName: 'Demo Citizen',
+    requestedAddress: 'Gram Panchayat Ward No. 4, Village Khed, Pune - 410501',
+    currentAddress: 'Old Gram Quarters, Khed Village, Pune',
+    district: 'Pune',
+    taluka: 'Khed',
+    state: 'Maharashtra',
+    pincode: '410501',
+    consentId: 'CONSENT-00124',
+    canonicalRequestHash: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    documentHash: 'sha256:a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e',
+    hashStatus: 'VERIFIED',
+    documentId: 'DOC-RURAL-001',
+    documentName: 'address_proof.pdf',
+    documentType: 'application/pdf',
+    documentSize: '142 KB',
+    acknowledgementId: 'ACK-RURAL-GM-2026-000124',
+    status: 'COMPLETED',
+    createdAt: '2026-08-30T10:14:50.000Z',
+    sentAt: '2026-08-30T10:14:55.000Z',
+    receivedAt: '2026-08-30T10:15:00.000Z',
+    validatedAt: '2026-08-30T10:15:01.000Z',
+    acceptedAt: '2026-08-30T10:15:02.000Z',
+    processingStartedAt: '2026-08-30T10:15:04.000Z',
+    completedAt: '2026-08-30T10:15:08.000Z',
+    officerRemarks: 'Address record synchronized with Gram Panchayat registry.',
+    reviewedBy: 'Rajesh Patil (Rural Development Officer)',
+    rawSourceJson: JSON.stringify({
+      applicationId: 'GM-2026-000124',
+      correlationId: 'CORR-26-000124',
+      requestVersion: 1,
+      serviceCode: 'ADDRESS_CHANGE',
+      citizen: { name: 'Demo Citizen', address: { line1: 'Gram Panchayat Ward No. 4, Village Khed', district: 'Pune' } },
+      consentId: 'CONSENT-00124'
+    })
   }
 ];
 
@@ -180,6 +225,7 @@ class DataStore {
       users: JSON.parse(JSON.stringify(initialUsers)),
       files: JSON.parse(JSON.stringify(initialFiles)),
       records: JSON.parse(JSON.stringify(initialRecords)),
+      govmeshRequests: JSON.parse(JSON.stringify(initialGovMeshRequests)),
       exceptions: JSON.parse(JSON.stringify(initialExceptions)),
       transfers: JSON.parse(JSON.stringify(initialTransfers)),
       auditLogs: JSON.parse(JSON.stringify(initialAuditLogs)),
@@ -188,22 +234,19 @@ class DataStore {
     };
 
     if (this.usePostgres) {
-      try {
-        this.pool = new Pool({
-          connectionString: process.env.DATABASE_URL,
-          ssl: { rejectUnauthorized: false }
-        });
-        this.initPostgres();
-      } catch (e) {
-        console.error('Failed to initialize PostgreSQL connection pool:', e);
-        this.usePostgres = false;
-      }
+      this.initPostgres();
     }
   }
 
   async initPostgres() {
-    if (!this.pool) return;
     try {
+      const pgModule = await import('pg');
+      const Pool = pgModule.default?.Pool || pgModule.Pool;
+      this.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+      });
+
       await this.pool.query(`
         CREATE TABLE IF NOT EXISTS users (
           id VARCHAR(100) PRIMARY KEY,
@@ -246,6 +289,45 @@ class DataStore {
           last_updated VARCHAR(100),
           consent_id VARCHAR(100),
           verified BOOLEAN
+        );
+
+        CREATE TABLE IF NOT EXISTS govmesh_requests (
+          id VARCHAR(100) PRIMARY KEY,
+          application_id VARCHAR(100) UNIQUE,
+          correlation_id VARCHAR(100),
+          request_version INT,
+          request_type VARCHAR(100),
+          service_code VARCHAR(100),
+          source_department VARCHAR(200),
+          target_department VARCHAR(200),
+          citizen_ref VARCHAR(100),
+          citizen_name VARCHAR(200),
+          requested_address TEXT,
+          current_address TEXT,
+          district VARCHAR(100),
+          taluka VARCHAR(100),
+          state VARCHAR(100),
+          pincode VARCHAR(50),
+          consent_id VARCHAR(100),
+          canonical_request_hash VARCHAR(256),
+          document_hash VARCHAR(256),
+          hash_status VARCHAR(50),
+          document_id VARCHAR(100),
+          document_name VARCHAR(200),
+          document_type VARCHAR(100),
+          document_size VARCHAR(50),
+          acknowledgement_id VARCHAR(100),
+          status VARCHAR(50),
+          created_at VARCHAR(100),
+          sent_at VARCHAR(100),
+          received_at VARCHAR(100),
+          validated_at VARCHAR(100),
+          accepted_at VARCHAR(100),
+          processing_started_at VARCHAR(100),
+          completed_at VARCHAR(100),
+          officer_remarks TEXT,
+          reviewed_by VARCHAR(200),
+          raw_source_json TEXT
         );
 
         CREATE TABLE IF NOT EXISTS exceptions (
@@ -291,7 +373,6 @@ class DataStore {
         );
       `);
 
-      // Check if users exist; if empty, seed
       const userRes = await this.pool.query('SELECT COUNT(*) FROM users');
       if (parseInt(userRes.rows[0].count, 10) === 0) {
         for (const u of initialUsers) {
@@ -314,32 +395,18 @@ class DataStore {
             [r.id, r.applicationId, r.citizenRef, r.citizenName, r.address, r.district, r.service, r.receivedDate, r.status, r.lastUpdated, r.consentId, r.verified]
           );
         }
-        for (const e of initialExceptions) {
+        for (const gr of initialGovMeshRequests) {
           await this.pool.query(
-            `INSERT INTO exceptions (id, application_id, file_id, error_type, description, citizen_name, address, district, created, priority, status, consent_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [e.id, e.applicationId, e.fileId, e.errorType, e.description, e.citizenName, e.address, e.district, e.created, e.priority, e.status, e.consentId]
+            `INSERT INTO govmesh_requests (id, application_id, correlation_id, request_version, request_type, service_code, source_department, target_department, citizen_ref, citizen_name, requested_address, current_address, district, taluka, state, pincode, consent_id, canonical_request_hash, document_hash, hash_status, document_id, document_name, document_type, document_size, acknowledgement_id, status, created_at, sent_at, received_at, validated_at, accepted_at, processing_started_at, completed_at, officer_remarks, reviewed_by, raw_source_json)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+             ON CONFLICT (id) DO NOTHING`,
+            [gr.id, gr.applicationId, gr.correlationId, gr.requestVersion, gr.requestType, gr.serviceCode, gr.sourceDepartment, gr.targetDepartment, gr.citizenRef, gr.citizenName, gr.requestedAddress, gr.currentAddress, gr.district, gr.taluka, gr.state, gr.pincode, gr.consentId, gr.canonicalRequestHash, gr.documentHash, gr.hashStatus, gr.documentId, gr.documentName, gr.documentType, gr.documentSize, gr.acknowledgementId, gr.status, gr.createdAt, gr.sentAt, gr.receivedAt, gr.validatedAt, gr.acceptedAt, gr.processingStartedAt, gr.completedAt, gr.officerRemarks, gr.reviewedBy, gr.rawSourceJson]
           );
         }
-        for (const t of initialTransfers) {
-          await this.pool.query(
-            `INSERT INTO transfers (id, file_name, destination, status, reason, time, retry_attempts, max_retries)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [t.id, t.fileName, t.destination, t.status, t.reason, t.time, t.retryAttempts, t.maxRetries]
-          );
-        }
-        for (const l of initialAuditLogs) {
-          await this.pool.query(
-            `INSERT INTO audit_logs (id, timestamp, event, application_id, file_id, officer, result, checksum)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [l.id, l.timestamp, l.event, l.applicationId, l.fileId, l.officer, l.result, l.checksum]
-          );
-        }
-        await this.pool.query('INSERT INTO system_state (key, data) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['health', JSON.stringify(initialSystemHealth)]);
-        await this.pool.query('INSERT INTO system_state (key, data) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', ['demo_controls', JSON.stringify(initialDemoControls)]);
       }
     } catch (e) {
-      console.error('PostgreSQL init error:', e);
+      console.warn('PostgreSQL not loaded; using in-memory datastore.');
+      this.usePostgres = false;
     }
   }
 
@@ -396,7 +463,7 @@ class DataStore {
   async getRecords() {
     if (this.usePostgres && this.pool) {
       try {
-        const res = await this.pool.query('SELECT id, application_id as "applicationId", citizen_ref as "citizenRef", citizen_name as "citizenName", address, district, service, received_date as "receivedDate", status, last_updated as "lastUpdated", consent_id as "consentId", verified FROM records');
+        const res = await this.pool.query('SELECT id, application_id as "applicationId", citizen_ref as "citizenRef", citizen_name as "citizenName", address, district, service, received_date as "receivedDate", status, last_updated as "lastUpdated", consent_id as "consentId", verified FROM records ORDER BY received_date DESC');
         return res.rows;
       } catch (e) { console.error('PG error:', e); }
     }
@@ -413,8 +480,96 @@ class DataStore {
         );
       } catch (e) { console.error('PG error:', e); }
     }
-    this.memory.records.push(recordObj);
+    this.memory.records.unshift(recordObj);
     return recordObj;
+  }
+
+  // --- GovMesh Interoperability Requests Accessors ---
+  async getGovMeshRequests() {
+    if (this.usePostgres && this.pool) {
+      try {
+        const res = await this.pool.query(`
+          SELECT id, application_id as "applicationId", correlation_id as "correlationId",
+                 request_version as "requestVersion", request_type as "requestType", service_code as "serviceCode",
+                 source_department as "sourceDepartment", target_department as "targetDepartment",
+                 citizen_ref as "citizenRef", citizen_name as "citizenName", requested_address as "requestedAddress",
+                 current_address as "currentAddress", district, taluka, state, pincode, consent_id as "consentId",
+                 canonical_request_hash as "canonicalRequestHash", document_hash as "documentHash", hash_status as "hashStatus",
+                 document_id as "documentId", document_name as "documentName", document_type as "documentType",
+                 document_size as "documentSize", acknowledgement_id as "acknowledgementId", status,
+                 created_at as "createdAt", sent_at as "sentAt", received_at as "receivedAt",
+                 validated_at as "validatedAt", accepted_at as "acceptedAt",
+                 processing_started_at as "processingStartedAt", completed_at as "completedAt",
+                 officer_remarks as "officerRemarks", reviewed_by as "reviewedBy", raw_source_json as "rawSourceJson"
+          FROM govmesh_requests ORDER BY received_at DESC
+        `);
+        return res.rows;
+      } catch (e) { console.error('PG error:', e); }
+    }
+    return this.memory.govmeshRequests;
+  }
+
+  async getGovMeshRequest(id) {
+    const requests = await this.getGovMeshRequests();
+    return requests.find(r => r.id === id || r.applicationId === id || r.correlationId === id);
+  }
+
+  async addGovMeshRequest(reqObj) {
+    if (this.usePostgres && this.pool) {
+      try {
+        await this.pool.query(
+          `INSERT INTO govmesh_requests (id, application_id, correlation_id, request_version, request_type, service_code, source_department, target_department, citizen_ref, citizen_name, requested_address, current_address, district, taluka, state, pincode, consent_id, canonical_request_hash, document_hash, hash_status, document_id, document_name, document_type, document_size, acknowledgement_id, status, created_at, sent_at, received_at, validated_at, accepted_at, processing_started_at, completed_at, officer_remarks, reviewed_by, raw_source_json)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+           ON CONFLICT (application_id) DO UPDATE SET
+             correlation_id = EXCLUDED.correlation_id,
+             status = EXCLUDED.status,
+             canonical_request_hash = EXCLUDED.canonical_request_hash,
+             document_hash = EXCLUDED.document_hash,
+             validated_at = EXCLUDED.validated_at,
+             accepted_at = EXCLUDED.accepted_at,
+             raw_source_json = EXCLUDED.raw_source_json`,
+          [reqObj.id, reqObj.applicationId, reqObj.correlationId, reqObj.requestVersion, reqObj.requestType, reqObj.serviceCode, reqObj.sourceDepartment, reqObj.targetDepartment, reqObj.citizenRef, reqObj.citizenName, reqObj.requestedAddress, reqObj.currentAddress, reqObj.district, reqObj.taluka, reqObj.state, reqObj.pincode, reqObj.consentId, reqObj.canonicalRequestHash, reqObj.documentHash, reqObj.hashStatus, reqObj.documentId, reqObj.documentName, reqObj.documentType, reqObj.documentSize, reqObj.acknowledgementId, reqObj.status, reqObj.createdAt, reqObj.sentAt, reqObj.receivedAt, reqObj.validatedAt, reqObj.acceptedAt, reqObj.processingStartedAt, reqObj.completedAt, reqObj.officerRemarks, reqObj.reviewedBy, reqObj.rawSourceJson]
+        );
+      } catch (e) { console.error('PG error:', e); }
+    }
+
+    const existingIdx = this.memory.govmeshRequests.findIndex(r => r.applicationId === reqObj.applicationId);
+    if (existingIdx >= 0) {
+      this.memory.govmeshRequests[existingIdx] = { ...this.memory.govmeshRequests[existingIdx], ...reqObj };
+    } else {
+      this.memory.govmeshRequests.unshift(reqObj);
+    }
+    return reqObj;
+  }
+
+  async updateGovMeshRequestStatus(id, status, officerRemarks = '', reviewedBy = '', timestamps = {}) {
+    const req = await this.getGovMeshRequest(id);
+    if (!req) return null;
+
+    req.status = status;
+    if (officerRemarks) req.officerRemarks = officerRemarks;
+    if (reviewedBy) req.reviewedBy = reviewedBy;
+    if (timestamps.validatedAt) req.validatedAt = timestamps.validatedAt;
+    if (timestamps.acceptedAt) req.acceptedAt = timestamps.acceptedAt;
+    if (timestamps.processingStartedAt) req.processingStartedAt = timestamps.processingStartedAt;
+    if (timestamps.completedAt) req.completedAt = timestamps.completedAt;
+
+    if (this.usePostgres && this.pool) {
+      try {
+        await this.pool.query(
+          `UPDATE govmesh_requests SET
+             status = $1, officer_remarks = $2, reviewed_by = $3,
+             validated_at = COALESCE($4, validated_at),
+             accepted_at = COALESCE($5, accepted_at),
+             processing_started_at = COALESCE($6, processing_started_at),
+             completed_at = COALESCE($7, completed_at)
+           WHERE id = $8 OR application_id = $8`,
+          [req.status, req.officerRemarks, req.reviewedBy, req.validatedAt, req.acceptedAt, req.processingStartedAt, req.completedAt, id]
+        );
+      } catch (e) { console.error('PG error:', e); }
+    }
+
+    return req;
   }
 
   async getExceptions() {
@@ -533,6 +688,7 @@ class DataStore {
       users: JSON.parse(JSON.stringify(initialUsers)),
       files: JSON.parse(JSON.stringify(initialFiles)),
       records: JSON.parse(JSON.stringify(initialRecords)),
+      govmeshRequests: JSON.parse(JSON.stringify(initialGovMeshRequests)),
       exceptions: JSON.parse(JSON.stringify(initialExceptions)),
       transfers: JSON.parse(JSON.stringify(initialTransfers)),
       auditLogs: JSON.parse(JSON.stringify(initialAuditLogs)),

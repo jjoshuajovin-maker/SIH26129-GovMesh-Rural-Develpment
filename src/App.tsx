@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, FileItem, ExceptionItem, ServiceRecord, FailedTransfer, AuditLog, DemoControls } from './types';
+import { User, FileItem, ExceptionItem, ServiceRecord, FailedTransfer, AuditLog, GovMeshRequest, DemoControls } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Banner } from './components/Banner';
@@ -19,6 +19,7 @@ import { SystemHealthPage } from './pages/SystemHealthPage';
 import { ServiceRecordsPage } from './pages/ServiceRecordsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { GovMeshRequestsPage } from './pages/GovMeshRequestsPage';
 
 export function App() {
   const [user, setUser] = useState<User | null>({
@@ -36,6 +37,7 @@ export function App() {
   const [kpis, setKpis] = useState<any>(null);
   const [legacyConnector, setLegacyConnector] = useState<any>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [govmeshRequests, setGovmeshRequests] = useState<GovMeshRequest[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   const [transfers, setTransfers] = useState<FailedTransfer[]>([]);
@@ -81,6 +83,18 @@ export function App() {
       }
     } catch (e) {
       console.error('Failed to load files:', e);
+    }
+  };
+
+  const loadGovMeshRequests = async () => {
+    try {
+      const res = await fetch('/api/rural/govmesh-requests');
+      if (res.ok) {
+        const data = await res.json();
+        setGovmeshRequests(data);
+      }
+    } catch (e) {
+      console.error('Failed to load govmesh requests:', e);
     }
   };
 
@@ -138,6 +152,7 @@ export function App() {
   const refreshAll = () => {
     loadDashboardData();
     loadFiles();
+    loadGovMeshRequests();
     loadExceptions();
     loadRecords();
     loadTransfers();
@@ -254,6 +269,72 @@ export function App() {
     }
   };
 
+  // GovMesh Request Handlers
+  const handleValidateGovMeshRequest = async (id: string, remarks?: string) => {
+    try {
+      await fetch(`/api/rural/govmesh-requests/${id}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks })
+      });
+      refreshAll();
+    } catch (e) {
+      console.error('Failed to validate govmesh request:', e);
+    }
+  };
+
+  const handleAcceptGovMeshRequest = async (id: string, remarks?: string) => {
+    try {
+      await fetch(`/api/rural/govmesh-requests/${id}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks })
+      });
+      refreshAll();
+    } catch (e) {
+      console.error('Failed to accept govmesh request:', e);
+    }
+  };
+
+  const handleStartProcessingGovMeshRequest = async (id: string, remarks?: string) => {
+    try {
+      await fetch(`/api/rural/govmesh-requests/${id}/start-processing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks })
+      });
+      refreshAll();
+    } catch (e) {
+      console.error('Failed to start processing govmesh request:', e);
+    }
+  };
+
+  const handleCompleteGovMeshRequest = async (id: string, remarks?: string) => {
+    try {
+      await fetch(`/api/rural/govmesh-requests/${id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ remarks })
+      });
+      refreshAll();
+    } catch (e) {
+      console.error('Failed to complete govmesh request:', e);
+    }
+  };
+
+  const handleRejectGovMeshRequest = async (id: string, reason?: string) => {
+    try {
+      await fetch(`/api/rural/govmesh-requests/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      refreshAll();
+    } catch (e) {
+      console.error('Failed to reject govmesh request:', e);
+    }
+  };
+
   const handleToggleFailure = async (type: string) => {
     try {
       const res = await fetch('/api/demo/failure', {
@@ -287,6 +368,7 @@ export function App() {
   }
 
   const selectedFile = files.find(f => f.id === selectedFileId) || files[0];
+  const pendingGovmeshCount = govmeshRequests.filter(r => r.status === 'RECEIVED' || r.status === 'VALIDATING' || r.status === 'ACCEPTED').length;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 font-sans">
@@ -299,6 +381,7 @@ export function App() {
           onNavigate={setCurrentPage}
           exceptionCount={exceptions.filter(e => e.status === 'Pending').length}
           failedTransferCount={transfers.filter(t => t.status === 'FAILED').length}
+          govmeshPendingCount={pendingGovmeshCount}
         />
 
         <main className="flex-1 p-6 overflow-y-auto">
@@ -309,6 +392,19 @@ export function App() {
               demoControls={demoControls}
               onToggleFailure={handleToggleFailure}
               onResetDemo={handleResetDemo}
+              onNavigate={setCurrentPage}
+            />
+          )}
+
+          {currentPage === 'govmesh-requests' && (
+            <GovMeshRequestsPage
+              requests={govmeshRequests}
+              onRefresh={loadGovMeshRequests}
+              onValidate={handleValidateGovMeshRequest}
+              onAccept={handleAcceptGovMeshRequest}
+              onStartProcessing={handleStartProcessingGovMeshRequest}
+              onComplete={handleCompleteGovMeshRequest}
+              onReject={handleRejectGovMeshRequest}
               onNavigate={setCurrentPage}
             />
           )}

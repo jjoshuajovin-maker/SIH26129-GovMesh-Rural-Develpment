@@ -17,6 +17,23 @@ export const sftpSimulator = {
     };
   },
 
+  getSafeSftpPath(baseFolder, userProvidedPath) {
+    if (!userProvidedPath || typeof userProvidedPath !== 'string') {
+      throw new Error('SFTP Security Error: Invalid filename or path');
+    }
+    // Reject path traversal sequences
+    if (userProvidedPath.includes('..') || userProvidedPath.includes('%2e%2e')) {
+      throw new Error('SFTP Security Error: Path traversal attempt blocked');
+    }
+    const baseName = path.basename(userProvidedPath);
+    const safeBase = path.resolve(process.cwd(), baseFolder);
+    const resolved = path.resolve(safeBase, baseName);
+    if (!resolved.startsWith(safeBase)) {
+      throw new Error('SFTP Security Error: Path traversal attempt blocked');
+    }
+    return resolved;
+  },
+
   calculateStringChecksum(content) {
     return crypto.createHash('sha256').update(content || '').digest('hex');
   },
@@ -55,9 +72,10 @@ export const sftpSimulator = {
   },
 
   generateResultCSV(fileName, batchResults) {
-    const outputFileName = fileName.endsWith('.csv')
-      ? fileName.replace('.csv', '_RESULT.csv')
-      : `${fileName}_RESULT.csv`;
+    const safeBaseName = path.basename(fileName);
+    const outputFileName = safeBaseName.endsWith('.csv')
+      ? safeBaseName.replace('.csv', '_RESULT.csv')
+      : `${safeBaseName}_RESULT.csv`;
 
     let csvContent = 'application_id,status,error_code,error_message\n';
     batchResults.forEach(res => {

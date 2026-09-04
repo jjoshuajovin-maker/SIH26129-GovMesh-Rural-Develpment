@@ -12,7 +12,7 @@ import {
   Activity,
   BarChart3,
   User,
-  Settings
+  Globe2
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,16 +20,19 @@ interface SidebarProps {
   onNavigate: (page: string) => void;
   exceptionCount?: number;
   failedTransferCount?: number;
+  govmeshPendingCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentPage,
   onNavigate,
   exceptionCount = 3,
-  failedTransferCount = 1
+  failedTransferCount = 1,
+  govmeshPendingCount = 0
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'govmesh-requests', label: 'GovMesh Requests', icon: Globe2, badge: govmeshPendingCount, badgeColor: 'bg-emerald-500 text-white' },
     { id: 'incoming-files', label: 'Incoming Files', icon: FolderInput },
     { id: 'file-processing', label: 'File Processing', icon: Cpu },
     { id: 'records', label: 'Rural Records', icon: FileSpreadsheet },
@@ -47,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-64 bg-slate-900 text-slate-300 min-h-screen flex flex-col border-r border-slate-800 shadow-inner">
       <div className="p-4 border-b border-slate-800 flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Department Navigation</span>
-        <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">v1.0-DEMO</span>
+        <span className="text-[10px] bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono font-bold">LIVE E2E</span>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -79,10 +82,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="p-4 border-t border-slate-800 bg-slate-950/60">
-        <div className="text-[11px] text-slate-400 font-semibold mb-1">GOVMESH INTEGRATION MODE</div>
+        <div className="text-[11px] text-slate-400 font-semibold mb-1">GOVMESH INTEROP MODE</div>
         <div className="flex items-center space-x-2 text-[11px] text-emerald-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span>Legacy CSV / SFTP Active</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>True Dynamic Cross-Repo Active</span>
         </div>
       </div>
     </aside>
