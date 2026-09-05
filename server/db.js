@@ -603,7 +603,12 @@ class DataStore {
               address, district, state, service, received_date, received_at, status,
               last_updated, updated_at, consent_id, verified, correlation_id
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            ON CONFLICT (application_id) DO NOTHING
+            ON CONFLICT (application_id) DO UPDATE SET
+              received_date = EXCLUDED.received_date,
+              received_at = EXCLUDED.received_at,
+              service = EXCLUDED.service,
+              citizen_name = EXCLUDED.citizen_name,
+              district = EXCLUDED.district
           `, [
             rec.id,
             rec.applicationId,
