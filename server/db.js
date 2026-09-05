@@ -593,6 +593,40 @@ class DataStore {
           checksum VARCHAR(256)
         );
       `);
+
+      // Automatically seed initial demo records into PostgreSQL database
+      for (const rec of initialRecords) {
+        try {
+          await this.pool.query(`
+            INSERT INTO records (
+              id, application_id, department_application_id, citizen_ref, citizen_name,
+              address, district, state, service, received_date, received_at, status,
+              last_updated, updated_at, consent_id, verified, correlation_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            ON CONFLICT (application_id) DO NOTHING
+          `, [
+            rec.id,
+            rec.applicationId,
+            rec.departmentApplicationId || rec.id,
+            rec.citizenRef || rec.citizenId,
+            rec.citizenName || rec.name,
+            typeof rec.address === 'object' ? JSON.stringify(rec.address) : rec.address,
+            rec.district || 'Pune',
+            rec.state || 'Maharashtra',
+            rec.service || 'Rural Address Update',
+            rec.receivedDate || rec.receivedAt,
+            rec.receivedAt || rec.receivedDate,
+            rec.status || 'RECEIVED',
+            rec.lastUpdated || rec.updatedAt,
+            rec.updatedAt || rec.lastUpdated,
+            rec.consentId,
+            true,
+            rec.correlationId
+          ]);
+        } catch (err) {
+          console.error('Error seeding record to Postgres:', rec.applicationId, err.message);
+        }
+      }
     } catch (e) {
       console.warn('PostgreSQL not initialized; using file / in-memory store:', e.message);
       this.usePostgres = false;
@@ -638,6 +672,27 @@ class DataStore {
           const res = await this.pool.query(query);
           list = res.rows;
         }
+
+        // Merge initial seed records to guarantee presence even if DB was just provisioned
+        const existingMap = new Map();
+        for (const r of list) existingMap.set(r.applicationId, r);
+        for (const initRec of initialRecords) {
+          if (!existingMap.has(initRec.applicationId)) {
+            existingMap.set(initRec.applicationId, { ...initRec });
+          } else {
+            const cur = existingMap.get(initRec.applicationId);
+            existingMap.set(initRec.applicationId, {
+              ...initRec,
+              ...cur,
+              source: cur.source || initRec.source,
+              gateway: cur.gateway || initRec.gateway,
+              priority: cur.priority || initRec.priority,
+              description: cur.description || initRec.description,
+              isDemo: initRec.isDemo
+            });
+          }
+        }
+        list = Array.from(existingMap.values());
       } catch (e) {
         console.error('PG error getting records:', e);
       }
