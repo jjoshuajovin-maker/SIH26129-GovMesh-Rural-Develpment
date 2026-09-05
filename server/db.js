@@ -64,9 +64,32 @@ class DataStore {
     }
   }
 
+  getStoreFilePath() {
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production' || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      try {
+        return path.resolve('/tmp', 'data_store.json');
+      } catch (e) {
+        return STORE_FILE;
+      }
+    }
+    return STORE_FILE;
+  }
+
   loadFromFile() {
     try {
-      if (fs.existsSync(STORE_FILE)) {
+      const filePath = this.getStoreFilePath();
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const loaded = JSON.parse(content);
+        if (loaded) {
+          if (Array.isArray(loaded.records)) this.memory.records = loaded.records;
+          if (Array.isArray(loaded.govmeshRequests)) this.memory.govmeshRequests = loaded.govmeshRequests;
+          if (Array.isArray(loaded.auditLogs)) this.memory.auditLogs = loaded.auditLogs;
+          if (Array.isArray(loaded.files)) this.memory.files = loaded.files;
+          if (Array.isArray(loaded.exceptions)) this.memory.exceptions = loaded.exceptions;
+          if (Array.isArray(loaded.transfers)) this.memory.transfers = loaded.transfers;
+        }
+      } else if (fs.existsSync(STORE_FILE)) {
         const content = fs.readFileSync(STORE_FILE, 'utf8');
         const loaded = JSON.parse(content);
         if (loaded) {
@@ -79,23 +102,31 @@ class DataStore {
         }
       }
     } catch (e) {
-      console.error('Error loading data_store.json:', e);
+      console.error('Error loading data store file:', e);
     }
   }
 
   saveToFile() {
+    const dataToSave = {
+      records: this.memory.records,
+      govmeshRequests: this.memory.govmeshRequests || [],
+      auditLogs: this.memory.auditLogs,
+      files: this.memory.files,
+      exceptions: this.memory.exceptions,
+      transfers: this.memory.transfers
+    };
+    const jsonStr = JSON.stringify(dataToSave, null, 2);
+
     try {
-      const dataToSave = {
-        records: this.memory.records,
-        govmeshRequests: this.memory.govmeshRequests || [],
-        auditLogs: this.memory.auditLogs,
-        files: this.memory.files,
-        exceptions: this.memory.exceptions,
-        transfers: this.memory.transfers
-      };
-      fs.writeFileSync(STORE_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
+      const filePath = this.getStoreFilePath();
+      fs.writeFileSync(filePath, jsonStr, 'utf8');
     } catch (e) {
-      console.error('Error saving data_store.json:', e);
+      try {
+        const fallbackPath = path.resolve('/tmp', 'data_store.json');
+        fs.writeFileSync(fallbackPath, jsonStr, 'utf8');
+      } catch (err) {
+        console.error('Error saving data store file:', err);
+      }
     }
   }
 

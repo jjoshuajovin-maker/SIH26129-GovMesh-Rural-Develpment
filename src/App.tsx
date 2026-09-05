@@ -149,7 +149,7 @@ export function App() {
     refreshAll();
     const interval = setInterval(() => {
       refreshAll();
-    }, 5000);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 

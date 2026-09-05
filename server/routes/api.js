@@ -145,8 +145,8 @@ router.post(['/rural/address-update', '/api/rural/address-update', '/govmesh/req
     }
 
     const body = req.body || {};
-    const appId = body.applicationId || body.appId || body.citizen?.applicationId;
-    const citizenId = body.citizenId || body.citizenRef || body.citizen?.citizenRef || body.citizen?.id;
+    const appId = body.applicationId || body.appId || body.id || body.citizen?.applicationId;
+    const citizenId = body.citizenId || body.citizenRef || body.citizen?.id || body.citizen?.citizenRef || body.citizen?.reference;
     const name = body.name || body.citizenName || body.citizen?.name;
     const rawAddress = body.address || body.citizen?.address;
 
@@ -253,7 +253,6 @@ router.get(['/rural/applications', '/api/rural/applications', '/records', '/api/
     const { status } = req.query;
     const records = await db.getRecords(status ? String(status) : null);
 
-    // If calling /api/records or /records, return array directly for frontend compatibility
     if (req.path.includes('/records')) {
       return res.json(records);
     }
