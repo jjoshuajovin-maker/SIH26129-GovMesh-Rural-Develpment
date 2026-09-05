@@ -406,7 +406,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
             </h3>
             <div className="grid grid-cols-2 gap-y-2.5 text-slate-300">
               <div><span className="text-slate-400">Consent Reference:</span></div>
-              <div className="font-mono text-amber-300 font-bold">{selectedRecord.consentId || 'DEMO-CONSENT-124'}</div>
+              <div className="font-mono text-amber-300 font-bold">{selectedRecord.consentId || 'GM-CONSENT-2026-000124'}</div>
 
               <div><span className="text-slate-400">Consent Purpose:</span></div>
               <div>Cross-department address amendment</div>
@@ -415,7 +415,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
               <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">ACTIVE &amp; VALID</span></div>
 
               <div><span className="text-slate-400">Correlation ID:</span></div>
-              <div className="font-mono text-[10px] text-amber-300 truncate">{selectedRecord.correlationId || 'DEMO-CORR-124'}</div>
+              <div className="font-mono text-[10px] text-amber-300 truncate">{selectedRecord.correlationId || 'GM-CORR-2026-000124'}</div>
 
               <div><span className="text-slate-400">Cryptographic Integrity:</span></div>
               <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">SHA-256 VERIFIED</span></div>

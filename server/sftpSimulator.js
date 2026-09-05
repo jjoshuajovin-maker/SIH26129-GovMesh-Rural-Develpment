@@ -40,7 +40,7 @@ export const sftpSimulator = {
 
   parseCSVString(content) {
     if (!content || typeof content !== 'string') {
-      content = `application_id,citizen_name,address,district,verified\nGM-2026-000124,Demo Citizen,Gram Panchayat Ward No 4 Village Khed,Pune,true`;
+      content = `application_id,citizen_name,address,district,verified\nGM-2026-000124,Rajesh Shantaram Patil,Flat 402 Shivshankar Heights Karve Road Kothrud,Pune,true`;
     }
     const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
     if (lines.length === 0) return { headers: [], rows: [], raw: content };
