@@ -72,17 +72,23 @@ export interface ExceptionItem {
 
 export interface ServiceRecord {
   id: string;
+  departmentApplicationId?: string;
   applicationId: string;
   citizenRef: string;
   citizenName: string;
   address: string;
   district: string;
+  state?: string;
   service: string;
   receivedDate: string;
+  receivedAt?: string;
   status: string;
   lastUpdated: string;
+  updatedAt?: string;
   consentId: string;
   verified: boolean;
+  correlationId?: string;
+  rejectionReason?: string;
 }
 
 export interface FailedTransfer {

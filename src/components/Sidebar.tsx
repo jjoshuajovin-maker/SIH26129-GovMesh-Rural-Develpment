@@ -11,8 +11,7 @@ import {
   ClipboardList,
   Activity,
   BarChart3,
-  User,
-  Globe2
+  User
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,24 +19,23 @@ interface SidebarProps {
   onNavigate: (page: string) => void;
   exceptionCount?: number;
   failedTransferCount?: number;
-  govmeshPendingCount?: number;
+  pendingReviewCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentPage,
   onNavigate,
-  exceptionCount = 3,
-  failedTransferCount = 1,
-  govmeshPendingCount = 0
+  exceptionCount = 0,
+  failedTransferCount = 0,
+  pendingReviewCount = 0
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'govmesh-requests', label: 'GovMesh Requests', icon: Globe2, badge: govmeshPendingCount, badgeColor: 'bg-emerald-500 text-white' },
+    { id: 'records', label: 'Rural Records', icon: FileSpreadsheet },
+    { id: 'officer-review', label: 'Officer Review', icon: UserCheck, badge: pendingReviewCount, badgeColor: 'bg-amber-500 text-slate-950 font-bold' },
+    { id: 'exception-queue', label: 'Exception Queue', icon: AlertTriangle, badge: exceptionCount },
     { id: 'incoming-files', label: 'Incoming Files', icon: FolderInput },
     { id: 'file-processing', label: 'File Processing', icon: Cpu },
-    { id: 'records', label: 'Rural Records', icon: FileSpreadsheet },
-    { id: 'exception-queue', label: 'Exception Queue', icon: AlertTriangle, badge: exceptionCount },
-    { id: 'officer-review', label: 'Officer Review', icon: UserCheck },
     { id: 'batch-results', label: 'Batch Results', icon: Layers },
     { id: 'failed-transfers', label: 'Failed Transfers', icon: WifiOff, badge: failedTransferCount, badgeColor: 'bg-red-500 text-white' },
     { id: 'audit-logs', label: 'Audit Logs', icon: ClipboardList },

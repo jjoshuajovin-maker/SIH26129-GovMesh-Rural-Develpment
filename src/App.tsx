@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, FileItem, ExceptionItem, ServiceRecord, FailedTransfer, AuditLog, GovMeshRequest, DemoControls } from './types';
+import { User, FileItem, ExceptionItem, ServiceRecord, FailedTransfer, AuditLog, DemoControls } from './types';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Banner } from './components/Banner';
@@ -19,7 +19,6 @@ import { SystemHealthPage } from './pages/SystemHealthPage';
 import { ServiceRecordsPage } from './pages/ServiceRecordsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ProfilePage } from './pages/ProfilePage';
-import { GovMeshRequestsPage } from './pages/GovMeshRequestsPage';
 
 export function App() {
   const [user, setUser] = useState<User | null>({
@@ -37,7 +36,6 @@ export function App() {
   const [kpis, setKpis] = useState<any>(null);
   const [legacyConnector, setLegacyConnector] = useState<any>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [govmeshRequests, setGovmeshRequests] = useState<GovMeshRequest[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionItem[]>([]);
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   const [transfers, setTransfers] = useState<FailedTransfer[]>([]);
@@ -51,12 +49,13 @@ export function App() {
     simulateDuplicateFile: false
   });
 
-  // Selected State
-  const [selectedFileId, setSelectedFileId] = useState<string>('FILE-000124');
+  // Selection States
+  const [selectedFileId, setSelectedFileId] = useState<string>('');
   const [selectedFileContent, setSelectedFileContent] = useState<any>({ headers: [], rows: [], raw: '' });
   const [validationResult, setValidationResult] = useState<any>(null);
   const [batchSummary, setBatchSummary] = useState<any>(null);
   const [selectedException, setSelectedException] = useState<ExceptionItem | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<ServiceRecord | null>(null);
 
   // Load Data from Backend API
   const loadDashboardData = async () => {
@@ -80,21 +79,12 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         setFiles(data);
+        if (data.length > 0 && !selectedFileId) {
+          setSelectedFileId(data[0].id);
+        }
       }
     } catch (e) {
       console.error('Failed to load files:', e);
-    }
-  };
-
-  const loadGovMeshRequests = async () => {
-    try {
-      const res = await fetch('/api/rural/govmesh-requests');
-      if (res.ok) {
-        const data = await res.json();
-        setGovmeshRequests(data);
-      }
-    } catch (e) {
-      console.error('Failed to load govmesh requests:', e);
     }
   };
 
@@ -104,9 +94,6 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         setExceptions(data);
-        if (data.length > 0 && !selectedException) {
-          setSelectedException(data[0]);
-        }
       }
     } catch (e) {
       console.error('Failed to load exceptions:', e);
@@ -118,7 +105,7 @@ export function App() {
       const res = await fetch('/api/records');
       if (res.ok) {
         const data = await res.json();
-        setRecords(data);
+        setRecords(Array.isArray(data) ? data : (data.applications || []));
       }
     } catch (e) {
       console.error('Failed to load records:', e);
@@ -152,7 +139,6 @@ export function App() {
   const refreshAll = () => {
     loadDashboardData();
     loadFiles();
-    loadGovMeshRequests();
     loadExceptions();
     loadRecords();
     loadTransfers();
@@ -232,6 +218,55 @@ export function App() {
     }
   };
 
+  // Officer Decision Handlers
+  const handleReviewRecord = async (appId: string) => {
+    try {
+      await fetch(`/api/rural/application/${appId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ officerId: user?.id || 'OFFICER-001' })
+      });
+      refreshAll();
+      if (selectedRecord && selectedRecord.applicationId === appId) {
+        setSelectedRecord({ ...selectedRecord, status: 'UNDER_REVIEW' });
+      }
+    } catch (e) {
+      console.error('Failed to review record:', e);
+    }
+  };
+
+  const handleApproveRecord = async (appId: string) => {
+    try {
+      await fetch(`/api/rural/application/${appId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ officerId: user?.id || 'OFFICER-001' })
+      });
+      refreshAll();
+      if (selectedRecord && selectedRecord.applicationId === appId) {
+        setSelectedRecord({ ...selectedRecord, status: 'APPROVED' });
+      }
+    } catch (e) {
+      console.error('Failed to approve record:', e);
+    }
+  };
+
+  const handleRejectRecord = async (appId: string, reason: string) => {
+    try {
+      await fetch(`/api/rural/application/${appId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ officerId: user?.id || 'OFFICER-001', reason })
+      });
+      refreshAll();
+      if (selectedRecord && selectedRecord.applicationId === appId) {
+        setSelectedRecord({ ...selectedRecord, status: 'REJECTED', rejectionReason: reason });
+      }
+    } catch (e) {
+      console.error('Failed to reject record:', e);
+    }
+  };
+
   const handleSaveCorrection = async (district: string, address: string) => {
     if (!selectedException) return;
     try {
@@ -273,72 +308,6 @@ export function App() {
     }
   };
 
-  // GovMesh Request Handlers
-  const handleValidateGovMeshRequest = async (id: string, remarks?: string) => {
-    try {
-      await fetch(`/api/rural/govmesh-requests/${id}/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remarks })
-      });
-      refreshAll();
-    } catch (e) {
-      console.error('Failed to validate govmesh request:', e);
-    }
-  };
-
-  const handleAcceptGovMeshRequest = async (id: string, remarks?: string) => {
-    try {
-      await fetch(`/api/rural/govmesh-requests/${id}/accept`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remarks })
-      });
-      refreshAll();
-    } catch (e) {
-      console.error('Failed to accept govmesh request:', e);
-    }
-  };
-
-  const handleStartProcessingGovMeshRequest = async (id: string, remarks?: string) => {
-    try {
-      await fetch(`/api/rural/govmesh-requests/${id}/start-processing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remarks })
-      });
-      refreshAll();
-    } catch (e) {
-      console.error('Failed to start processing govmesh request:', e);
-    }
-  };
-
-  const handleCompleteGovMeshRequest = async (id: string, remarks?: string) => {
-    try {
-      await fetch(`/api/rural/govmesh-requests/${id}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ remarks })
-      });
-      refreshAll();
-    } catch (e) {
-      console.error('Failed to complete govmesh request:', e);
-    }
-  };
-
-  const handleRejectGovMeshRequest = async (id: string, reason?: string) => {
-    try {
-      await fetch(`/api/rural/govmesh-requests/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
-      });
-      refreshAll();
-    } catch (e) {
-      console.error('Failed to reject govmesh request:', e);
-    }
-  };
-
   const handleToggleFailure = async (type: string) => {
     try {
       const res = await fetch('/api/demo/failure', {
@@ -372,7 +341,7 @@ export function App() {
   }
 
   const selectedFile = files.find(f => f.id === selectedFileId) || files[0];
-  const pendingGovmeshCount = govmeshRequests.filter(r => r.status === 'RECEIVED' || r.status === 'VALIDATING' || r.status === 'ACCEPTED').length;
+  const pendingReviewCount = records.filter(r => (r.status || 'RECEIVED').toUpperCase() === 'RECEIVED' || (r.status || '').toUpperCase() === 'UNDER_REVIEW').length;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 font-sans">
@@ -382,10 +351,15 @@ export function App() {
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
         <Sidebar
           currentPage={currentPage}
-          onNavigate={setCurrentPage}
+          onNavigate={(page) => {
+            if (page === 'officer-review') {
+              // When navigating from sidebar, don't force a single exception or record
+            }
+            setCurrentPage(page);
+          }}
           exceptionCount={exceptions.filter(e => e.status === 'Pending').length}
           failedTransferCount={transfers.filter(t => t.status === 'FAILED').length}
-          govmeshPendingCount={pendingGovmeshCount}
+          pendingReviewCount={pendingReviewCount}
         />
 
         <main className="flex-1 p-6 overflow-y-auto">
@@ -396,19 +370,6 @@ export function App() {
               demoControls={demoControls}
               onToggleFailure={handleToggleFailure}
               onResetDemo={handleResetDemo}
-              onNavigate={setCurrentPage}
-            />
-          )}
-
-          {currentPage === 'govmesh-requests' && (
-            <GovMeshRequestsPage
-              requests={govmeshRequests}
-              onRefresh={loadGovMeshRequests}
-              onValidate={handleValidateGovMeshRequest}
-              onAccept={handleAcceptGovMeshRequest}
-              onStartProcessing={handleStartProcessingGovMeshRequest}
-              onComplete={handleCompleteGovMeshRequest}
-              onReject={handleRejectGovMeshRequest}
               onNavigate={setCurrentPage}
             />
           )}
@@ -464,15 +425,30 @@ export function App() {
               exceptions={exceptions}
               onReviewException={(exc) => {
                 setSelectedException(exc);
+                setSelectedRecord(null);
                 setCurrentPage('officer-review');
               }}
               onNavigate={setCurrentPage}
             />
           )}
 
-          {currentPage === 'officer-review' && selectedException && (
+          {currentPage === 'officer-review' && (
             <OfficerReviewPage
-              exception={selectedException}
+              selectedRecord={selectedRecord}
+              selectedException={selectedException}
+              records={records}
+              exceptions={exceptions}
+              onSelectRecord={(rec) => {
+                setSelectedRecord(rec);
+                setSelectedException(null);
+              }}
+              onSelectException={(exc) => {
+                setSelectedException(exc);
+                setSelectedRecord(null);
+              }}
+              onReviewRecord={handleReviewRecord}
+              onApproveRecord={handleApproveRecord}
+              onRejectRecord={handleRejectRecord}
               onSaveCorrection={handleSaveCorrection}
               onReprocess={handleReprocessException}
               onNavigate={setCurrentPage}
@@ -496,7 +472,14 @@ export function App() {
           )}
 
           {currentPage === 'records' && (
-            <ServiceRecordsPage records={records} onNavigate={setCurrentPage} />
+            <ServiceRecordsPage
+              records={records}
+              onSelectRecord={(rec) => {
+                setSelectedRecord(rec);
+                setSelectedException(null);
+              }}
+              onNavigate={setCurrentPage}
+            />
           )}
 
           {currentPage === 'reports' && (

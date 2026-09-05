@@ -1,186 +1,686 @@
 import React, { useState } from 'react';
-import { ExceptionItem } from '../types';
+import { ExceptionItem, ServiceRecord } from '../types';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { CorrectionModal } from './CorrectionModal';
-import { UserCheck, Edit3, RefreshCw, CheckCircle, XCircle, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+import {
+  UserCheck,
+  Edit3,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  ShieldCheck,
+  CheckCircle2,
+  Clock,
+  FileSpreadsheet,
+  ArrowRight,
+  Filter,
+  Search,
+  ChevronRight,
+  MapPin,
+  Building2,
+  FileText
+} from 'lucide-react';
 
 interface OfficerReviewPageProps {
-  exception: ExceptionItem;
+  selectedRecord?: ServiceRecord | null;
+  selectedException?: ExceptionItem | null;
+  records: ServiceRecord[];
+  exceptions: ExceptionItem[];
+  onSelectRecord: (rec: ServiceRecord | null) => void;
+  onSelectException: (exc: ExceptionItem | null) => void;
+  onReviewRecord: (id: string) => Promise<void>;
+  onApproveRecord: (id: string) => Promise<void>;
+  onRejectRecord: (id: string, reason: string) => Promise<void>;
   onSaveCorrection: (district: string, address: string) => void;
   onReprocess: () => void;
   onNavigate: (page: string) => void;
 }
 
 export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
-  exception,
+  selectedRecord,
+  selectedException,
+  records,
+  exceptions,
+  onSelectRecord,
+  onSelectException,
+  onReviewRecord,
+  onApproveRecord,
+  onRejectRecord,
   onSaveCorrection,
   onReprocess,
   onNavigate
 }) => {
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [activeTab, setActiveTab] = useState<'APPLICATIONS' | 'EXCEPTIONS'>('APPLICATIONS');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const handleAction = (type: string) => {
-    setActionMessage(`Officer action '${type}' recorded in Audit Logs.`);
-  };
+  // ---------------------------------------------------------
+  // 1. SPECIFIC EXCEPTION REVIEW VIEW
+  // ---------------------------------------------------------
+  if (selectedException) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs
+          items={[
+            { label: 'Exception Queue', page: 'exception-queue' },
+            { label: `Officer Review: ${selectedException.applicationId}` }
+          ]}
+          onNavigate={onNavigate}
+        />
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="bg-gov-blue text-amber-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                APPLICATION: {selectedException.applicationId}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                selectedException.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                STATUS: {selectedException.status}
+              </span>
+            </div>
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mt-1">
+              Officer Case Review &amp; Exception Handling
+            </h2>
+          </div>
+
+          <div className="mt-3 sm:mt-0 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => onSelectException(null)}
+              className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs px-3 py-2 rounded shadow-sm transition"
+            >
+              ← Back to Queue
+            </button>
+            <button
+              onClick={() => setShowCorrectionModal(true)}
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Correct Data</span>
+            </button>
+            <button
+              onClick={onReprocess}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Reprocess</span>
+            </button>
+          </div>
+        </div>
+
+        {actionMessage && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 text-xs text-emerald-800 font-semibold rounded">
+            ✓ {actionMessage}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-3 text-xs">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-2 flex items-center">
+              <UserCheck className="w-4 h-4 text-gov-blue mr-2" /> Application Information
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2 text-slate-600">
+              <div><span className="font-semibold text-slate-900">Application ID:</span></div>
+              <div className="font-mono text-gov-blue font-bold">{selectedException.applicationId}</div>
+
+              <div><span className="font-semibold text-slate-900">Citizen Name:</span></div>
+              <div className="font-bold text-slate-900">{selectedException.citizenName}</div>
+
+              <div><span className="font-semibold text-slate-900">Service Category:</span></div>
+              <div>Local Rural Record Update</div>
+
+              <div><span className="font-semibold text-slate-900">Assigned District:</span></div>
+              <div className="font-bold text-amber-700">{selectedException.district || '(Empty / Missing Field)'}</div>
+
+              <div><span className="font-semibold text-slate-900">Gram Panchayat Address:</span></div>
+              <div>{selectedException.address || 'N/A'}</div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 text-white p-5 rounded-lg border border-slate-800 shadow-sm space-y-3 text-xs">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 border-b border-slate-800 pb-2 flex items-center">
+              <ShieldCheck className="w-4 h-4 text-amber-400 mr-2" /> Citizen Consent Verification
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2 text-slate-300">
+              <div><span className="text-slate-400">Consent Reference:</span></div>
+              <div className="font-mono text-amber-300 font-bold">{selectedException.consentId || 'CONSENT-VERIFIED'}</div>
+
+              <div><span className="text-slate-400">Consent Purpose:</span></div>
+              <div>Rural local-government address update</div>
+
+              <div><span className="text-slate-400">Consent Status:</span></div>
+              <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">ACTIVE &amp; VALID</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-5 space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-2">
+            Validation Check Diagnostic
+          </h3>
+          <div className="bg-red-50 border border-red-200 p-4 rounded text-xs space-y-2">
+            <div className="flex items-center space-x-2 text-red-800 font-bold">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span>Validation Failure Diagnostic: {selectedException.errorType}</span>
+            </div>
+            <p className="text-slate-700">{selectedException.description}</p>
+          </div>
+        </div>
+
+        {showCorrectionModal && (
+          <CorrectionModal
+            exception={selectedException}
+            onClose={() => setShowCorrectionModal(false)}
+            onSaveCorrection={(d, a) => {
+              onSaveCorrection(d, a);
+              setShowCorrectionModal(false);
+              setActionMessage('Correction applied successfully.');
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------
+  // 2. SPECIFIC APPLICATION RECORD REVIEW VIEW
+  // ---------------------------------------------------------
+  if (selectedRecord) {
+    const st = (selectedRecord.status || 'RECEIVED').toUpperCase();
+    let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
+    if (st === 'UNDER_REVIEW') badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
+    else if (st === 'APPROVED' || st === 'COMPLETED') badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    else if (st === 'REJECTED' || st === 'FAILED') badgeClass = 'bg-red-100 text-red-800 border-red-300';
+
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs
+          items={[
+            { label: 'Rural Records', page: 'records' },
+            { label: `Officer Review: ${selectedRecord.applicationId}` }
+          ]}
+          onNavigate={onNavigate}
+        />
+
+        {/* Header with Officer Decision Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="bg-gov-blue text-amber-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                APPLICATION: {selectedRecord.applicationId}
+              </span>
+              <span className="bg-slate-800 text-slate-200 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
+                DEPT REF: {selectedRecord.departmentApplicationId || selectedRecord.id}
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass}`}>
+                {st}
+              </span>
+            </div>
+            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mt-1">
+              Officer Case Review &amp; Official Approval
+            </h2>
+          </div>
+
+          <div className="mt-3 sm:mt-0 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => onSelectRecord(null)}
+              className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs px-3 py-2 rounded shadow-sm transition"
+            >
+              ← Back to Review Queue
+            </button>
+
+            {st === 'RECEIVED' && (
+              <button
+                disabled={actionLoading}
+                onClick={async () => {
+                  setActionLoading(true);
+                  try {
+                    await onReviewRecord(selectedRecord.applicationId);
+                    setActionMessage('Application placed under officer review.');
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2 rounded shadow transition flex items-center space-x-1"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Start Review</span>
+              </button>
+            )}
+
+            {(st === 'UNDER_REVIEW' || st === 'RECEIVED') && (
+              <>
+                <button
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await onApproveRecord(selectedRecord.applicationId);
+                      setActionMessage('Application APPROVED by Officer. Gram Panchayat register updated.');
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded shadow transition flex items-center space-x-1"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>Approve Application</span>
+                </button>
+
+                <button
+                  disabled={actionLoading}
+                  onClick={() => setRejectModalOpen(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Reject</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {actionMessage && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 text-xs text-emerald-800 font-semibold rounded">
+            ✓ {actionMessage}
+          </div>
+        )}
+
+        {/* Detailed Panels */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Panel 1: Citizen & Application Information */}
+          <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-3 text-xs">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-2 flex items-center">
+              <Building2 className="w-4 h-4 text-gov-blue mr-2" /> Application &amp; Citizen Information
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2 text-slate-600">
+              <div><span className="font-semibold text-slate-900">Citizen Name:</span></div>
+              <div className="font-bold text-slate-900">{selectedRecord.citizenName}</div>
+
+              <div><span className="font-semibold text-slate-900">Citizen Reference:</span></div>
+              <div className="font-mono text-slate-700">{selectedRecord.citizenRef}</div>
+
+              <div><span className="font-semibold text-slate-900">Service Category:</span></div>
+              <div>{selectedRecord.service || 'Gram Panchayat Address Update'}</div>
+
+              <div><span className="font-semibold text-slate-900">Assigned District:</span></div>
+              <div className="font-bold text-amber-700">{selectedRecord.district || 'Pune'}</div>
+
+              <div><span className="font-semibold text-slate-900">State:</span></div>
+              <div>{selectedRecord.state || 'Maharashtra'}</div>
+
+              <div><span className="font-semibold text-slate-900">Received Date / Time:</span></div>
+              <div className="font-mono">{new Date(selectedRecord.receivedDate || selectedRecord.receivedAt || Date.now()).toLocaleString()}</div>
+
+              <div><span className="font-semibold text-slate-900">Requested Address:</span></div>
+              <div className="col-span-2 bg-slate-50 p-2.5 rounded border border-slate-200 font-sans text-slate-900 font-medium">
+                {selectedRecord.address}
+              </div>
+            </div>
+          </div>
+
+          {/* Panel 2: Citizen Consent & Cryptographic Integrity */}
+          <div className="bg-slate-900 text-white p-5 rounded-lg border border-slate-800 shadow-sm space-y-3 text-xs">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 border-b border-slate-800 pb-2 flex items-center">
+              <ShieldCheck className="w-4 h-4 text-amber-400 mr-2" /> Consent &amp; Cryptographic Verification
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2 text-slate-300">
+              <div><span className="text-slate-400">Consent Reference:</span></div>
+              <div className="font-mono text-amber-300 font-bold">{selectedRecord.consentId || 'CONSENT-GOVMESH-2026'}</div>
+
+              <div><span className="text-slate-400">Consent Purpose:</span></div>
+              <div>Cross-department address amendment</div>
+
+              <div><span className="text-slate-400">Consent Status:</span></div>
+              <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">ACTIVE &amp; VALID</span></div>
+
+              <div><span className="text-slate-400">Correlation ID:</span></div>
+              <div className="font-mono text-[10px] text-amber-300 truncate">{selectedRecord.correlationId || 'N/A'}</div>
+
+              <div><span className="text-slate-400">Cryptographic Integrity:</span></div>
+              <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">SHA-256 VERIFIED</span></div>
+
+              {selectedRecord.rejectionReason && (
+                <>
+                  <div className="text-red-400 font-bold">Rejection Reason:</div>
+                  <div className="text-red-300 font-semibold">{selectedRecord.rejectionReason}</div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Reject Modal */}
+        {rejectModalOpen && (
+          <div className="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-2xl space-y-4">
+              <h3 className="text-base font-bold text-slate-900 flex items-center">
+                <XCircle className="w-5 h-5 text-red-600 mr-2" /> Reject Application
+              </h3>
+              <p className="text-xs text-slate-600">
+                Please enter the official reason for rejecting application <code className="font-bold text-gov-blue">{selectedRecord.applicationId}</code>:
+              </p>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. Address details could not be verified by Gram Panchayat field staff..."
+                rows={3}
+                className="w-full text-xs p-2 border border-slate-300 rounded focus:ring-2 focus:ring-red-500 focus:outline-none"
+              />
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setRejectModalOpen(false)}
+                  className="px-3 py-1.5 bg-slate-200 text-slate-700 text-xs font-semibold rounded hover:bg-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={!rejectReason.trim()}
+                  onClick={async () => {
+                    await onRejectRecord(selectedRecord.applicationId, rejectReason);
+                    setRejectModalOpen(false);
+                    setActionMessage('Application rejected with official reason.');
+                  }}
+                  className="px-4 py-1.5 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 disabled:opacity-50"
+                >
+                  Confirm Rejection
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------
+  // 3. OFFICER REVIEW QUEUE (DEFAULT VIEW WHEN NAVIGATING)
+  // ---------------------------------------------------------
+  const pendingApps = records.filter(r => (r.status || 'RECEIVED').toUpperCase() === 'RECEIVED' || (r.status || '').toUpperCase() === 'UNDER_REVIEW');
+  const filteredRecords = records.filter(r => {
+    const st = (r.status || 'RECEIVED').toUpperCase();
+    const matchesFilter =
+      statusFilter === 'ALL' ? true :
+      statusFilter === 'PENDING' ? (st === 'RECEIVED' || st === 'UNDER_REVIEW') :
+      statusFilter === 'APPROVED' ? (st === 'APPROVED' || st === 'COMPLETED') :
+      statusFilter === 'REJECTED' ? (st === 'REJECTED' || st === 'FAILED') :
+      st === statusFilter;
+
+    const matchesSearch =
+      r.applicationId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.citizenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.address.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesFilter && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs
-        items={[
-          { label: 'Exception Queue', page: 'exception-queue' },
-          { label: `Officer Review: ${exception.applicationId}` }
-        ]}
-        onNavigate={onNavigate}
-      />
+      <Breadcrumbs items={[{ label: 'Officer Review Queue' }]} onNavigate={onNavigate} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
         <div>
-          <div className="flex items-center space-x-2">
-            <span className="bg-gov-blue text-amber-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
-              APPLICATION: {exception.applicationId}
-            </span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-              exception.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-            }`}>
-              STATUS: {exception.status}
-            </span>
-          </div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mt-1">
-            Officer Case Review &amp; Exception Handling
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+            Officer Case Review &amp; Approval Queue
           </h2>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="mt-3 sm:mt-0 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => handleAction('Approved')}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span>Approve</span>
-          </button>
-
-          <button
-            onClick={() => setShowCorrectionModal(true)}
-            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Correct</span>
-          </button>
-
-          <button
-            onClick={() => handleAction('Information Requested')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
-          >
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Request Info</span>
-          </button>
-
-          <button
-            onClick={onReprocess}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reprocess</span>
-          </button>
-
-          <button
-            onClick={() => handleAction('Rejected')}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 py-2 rounded shadow transition flex items-center space-x-1"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            <span>Reject</span>
-          </button>
+          <p className="text-xs text-slate-500 font-medium">
+            Inspect incoming cross-department citizen applications, verify Gram Panchayat records, and authorize state-level updates.
+          </p>
         </div>
       </div>
 
-      {actionMessage && (
-        <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 text-xs text-emerald-800 font-semibold rounded">
-          ✓ {actionMessage}
+      {/* Quick KPI Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div
+          onClick={() => { setActiveTab('APPLICATIONS'); setStatusFilter('PENDING'); }}
+          className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:border-amber-400 transition"
+        >
+          <div className="text-[11px] font-bold uppercase text-slate-500">Pending Review</div>
+          <div className="text-2xl font-black text-amber-600 mt-1">{pendingApps.length}</div>
+        </div>
+        <div
+          onClick={() => { setActiveTab('APPLICATIONS'); setStatusFilter('APPROVED'); }}
+          className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:border-emerald-400 transition"
+        >
+          <div className="text-[11px] font-bold uppercase text-slate-500">Approved Cases</div>
+          <div className="text-2xl font-black text-emerald-600 mt-1">
+            {records.filter(r => (r.status || '').toUpperCase() === 'APPROVED' || (r.status || '').toUpperCase() === 'COMPLETED').length}
+          </div>
+        </div>
+        <div
+          onClick={() => { setActiveTab('APPLICATIONS'); setStatusFilter('ALL'); }}
+          className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:border-blue-400 transition"
+        >
+          <div className="text-[11px] font-bold uppercase text-slate-500">Total Applications</div>
+          <div className="text-2xl font-black text-gov-blue mt-1">{records.length}</div>
+        </div>
+        <div
+          onClick={() => setActiveTab('EXCEPTIONS')}
+          className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm cursor-pointer hover:border-purple-400 transition"
+        >
+          <div className="text-[11px] font-bold uppercase text-slate-500">Exceptions Queue</div>
+          <div className="text-2xl font-black text-purple-600 mt-1">{exceptions.length}</div>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-200 space-x-4">
+        <button
+          onClick={() => setActiveTab('APPLICATIONS')}
+          className={`pb-2.5 text-xs font-bold transition flex items-center space-x-1.5 ${
+            activeTab === 'APPLICATIONS'
+              ? 'border-b-2 border-gov-blue text-gov-blue'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Citizen Applications ({records.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('EXCEPTIONS')}
+          className={`pb-2.5 text-xs font-bold transition flex items-center space-x-1.5 ${
+            activeTab === 'EXCEPTIONS'
+              ? 'border-b-2 border-gov-blue text-gov-blue'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <AlertCircle className="w-4 h-4" />
+          <span>Exceptions &amp; Corrections ({exceptions.length})</span>
+        </button>
+      </div>
+
+      {activeTab === 'APPLICATIONS' && (
+        <div className="space-y-4">
+          {/* Filters & Search */}
+          <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by Application ID, Citizen Name, Address..."
+                className="pl-9 w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-gov-blue"
+              />
+            </div>
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded text-xs bg-white focus:ring-2 focus:ring-gov-blue"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PENDING">Pending Review (RECEIVED / UNDER_REVIEW)</option>
+                <option value="RECEIVED">RECEIVED</option>
+                <option value="UNDER_REVIEW">UNDER_REVIEW</option>
+                <option value="APPROVED">APPROVED</option>
+                <option value="REJECTED">REJECTED</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px]">
+                    <th className="p-3">Application ID</th>
+                    <th className="p-3">Citizen Name</th>
+                    <th className="p-3">District</th>
+                    <th className="p-3">Address</th>
+                    <th className="p-3">Received Date</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Officer Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-500 font-sans text-xs">
+                        <div className="max-w-sm mx-auto space-y-2">
+                          <UserCheck className="w-8 h-8 text-slate-400 mx-auto" />
+                          <div className="font-bold text-slate-700">No applications in this queue</div>
+                          <p className="text-slate-500 text-[11px]">
+                            Real citizen applications submitted via GovMesh to <code className="bg-slate-100 px-1 py-0.5 rounded text-gov-blue">/api/rural/address-update</code> will appear here automatically for officer review.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((rec) => {
+                      const st = (rec.status || 'RECEIVED').toUpperCase();
+                      let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                      if (st === 'UNDER_REVIEW') badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
+                      else if (st === 'APPROVED' || st === 'COMPLETED') badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                      else if (st === 'REJECTED' || st === 'FAILED') badgeClass = 'bg-red-100 text-red-800 border-red-300';
+
+                      return (
+                        <tr key={rec.id} className="hover:bg-slate-50 transition font-mono">
+                          <td className="p-3 font-bold text-gov-blue">
+                            <button
+                              onClick={() => onSelectRecord(rec)}
+                              className="hover:underline flex items-center space-x-1"
+                            >
+                              <span>{rec.applicationId}</span>
+                              <ChevronRight className="w-3 h-3 text-slate-400" />
+                            </button>
+                          </td>
+                          <td className="p-3 font-sans font-semibold text-slate-900">{rec.citizenName}</td>
+                          <td className="p-3 font-sans font-bold text-amber-700">{rec.district}</td>
+                          <td className="p-3 font-sans text-slate-600 truncate max-w-[200px]">{rec.address}</td>
+                          <td className="p-3 text-slate-500">{new Date(rec.receivedDate || rec.receivedAt || Date.now()).toLocaleDateString()}</td>
+                          <td className="p-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center border ${badgeClass}`}>
+                              {st}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-sans">
+                            <div className="flex items-center justify-end space-x-1">
+                              <button
+                                onClick={() => onSelectRecord(rec)}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] px-2 py-1 rounded border border-slate-300"
+                              >
+                                View Case
+                              </button>
+                              {st === 'RECEIVED' && (
+                                <button
+                                  onClick={async () => {
+                                    await onReviewRecord(rec.applicationId);
+                                  }}
+                                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] px-2 py-1 rounded"
+                                >
+                                  Review
+                                </button>
+                              )}
+                              {(st === 'UNDER_REVIEW' || st === 'RECEIVED') && (
+                                <button
+                                  onClick={async () => {
+                                    await onApproveRecord(rec.applicationId);
+                                  }}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-2 py-1 rounded"
+                                >
+                                  Approve
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Grid of Information Panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Panel 1: Application Information */}
-        <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-3 text-xs">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-2 flex items-center">
-            <UserCheck className="w-4 h-4 text-gov-blue mr-2" /> Application Information
-          </h3>
-          <div className="grid grid-cols-2 gap-y-2 text-slate-600">
-            <div><span className="font-semibold text-slate-900">Application ID:</span></div>
-            <div className="font-mono text-gov-blue font-bold">{exception.applicationId}</div>
-
-            <div><span className="font-semibold text-slate-900">Citizen Reference:</span></div>
-            <div className="font-mono text-slate-700">CITIZEN-001 (Demo Citizen)</div>
-
-            <div><span className="font-semibold text-slate-900">Service Category:</span></div>
-            <div>Local Rural Record Update</div>
-
-            <div><span className="font-semibold text-slate-900">Assigned District:</span></div>
-            <div className="font-bold text-amber-700">{exception.district || '(Empty / Missing Field)'}</div>
-
-            <div><span className="font-semibold text-slate-900">Gram Panchayat Address:</span></div>
-            <div>{exception.address || 'Plot 12 Gram Panchayat Road'}</div>
-
-            <div><span className="font-semibold text-slate-900">Panchayat Verification:</span></div>
-            <div><span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">VERIFIED</span></div>
+      {activeTab === 'EXCEPTIONS' && (
+        <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px]">
+                  <th className="p-3">Application ID</th>
+                  <th className="p-3">Citizen Name</th>
+                  <th className="p-3">Error Diagnostic</th>
+                  <th className="p-3">Priority</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {exceptions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500 font-sans text-xs">
+                      No active exceptions in the queue.
+                    </td>
+                  </tr>
+                ) : (
+                  exceptions.map((exc) => (
+                    <tr key={exc.id} className="hover:bg-slate-50 transition font-mono">
+                      <td className="p-3 font-bold text-gov-blue">{exc.applicationId}</td>
+                      <td className="p-3 font-sans font-semibold text-slate-900">{exc.citizenName}</td>
+                      <td className="p-3 font-sans text-red-700 font-semibold">{exc.errorType}</td>
+                      <td className="p-3 font-sans">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          exc.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {exc.priority}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          exc.status === 'Resolved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {exc.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-sans">
+                        <button
+                          onClick={() => onSelectException(exc)}
+                          className="bg-gov-blue hover:bg-blue-800 text-white font-bold text-[10px] px-2.5 py-1 rounded"
+                        >
+                          Review &amp; Fix
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        {/* Panel 2: Consent Details */}
-        <div className="bg-slate-900 text-white p-5 rounded-lg border border-slate-800 shadow-sm space-y-3 text-xs">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 border-b border-slate-800 pb-2 flex items-center">
-            <ShieldCheck className="w-4 h-4 text-amber-400 mr-2" /> Citizen Consent Verification
-          </h3>
-          <div className="grid grid-cols-2 gap-y-2 text-slate-300">
-            <div><span className="text-slate-400">Consent Reference:</span></div>
-            <div className="font-mono text-amber-300 font-bold">{exception.consentId || 'CONSENT-00125'}</div>
-
-            <div><span className="text-slate-400">Consent Purpose:</span></div>
-            <div>Rural local-government address update</div>
-
-            <div><span className="text-slate-400">Consent Status:</span></div>
-            <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">ACTIVE &amp; VALID</span></div>
-
-            <div><span className="text-slate-400">Permitted Fields:</span></div>
-            <div className="font-mono text-[10px] text-slate-300">citizen_name, address, district, verified</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Panel 3: Incoming CSV Data vs Validation Result */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-5 space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-2">
-          Received CSV Raw Row &amp; Validation Check Breakdown
-        </h3>
-
-        <div className="bg-slate-950 text-amber-300 font-mono text-xs p-3 rounded overflow-x-auto">
-          application_id,citizen_name,address,district,verified<br />
-          {exception.applicationId},{exception.citizenName},{exception.address},{exception.district || ''},true
-        </div>
-
-        <div className="bg-red-50 border border-red-200 p-4 rounded text-xs space-y-2">
-          <div className="flex items-center space-x-2 text-red-800 font-bold">
-            <AlertCircle className="w-4 h-4 text-red-600" />
-            <span>Validation Failure Diagnostic: {exception.errorType}</span>
-          </div>
-          <p className="text-slate-700">{exception.description}</p>
-        </div>
-      </div>
-
-      {/* Correction Modal */}
-      {showCorrectionModal && (
-        <CorrectionModal
-          exception={exception}
-          onClose={() => setShowCorrectionModal(false)}
-          onSaveCorrection={(d, a) => {
-            onSaveCorrection(d, a);
-            setShowCorrectionModal(false);
-          }}
-        />
       )}
     </div>
   );

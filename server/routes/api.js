@@ -1,15 +1,11 @@
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
 import { db } from '../db.js';
 import { sftpSimulator } from '../sftpSimulator.js';
 import { validationEngine } from '../validationEngine.js';
-import { sendGovMeshStatusCallback } from '../callbackService.js';
 
 const router = express.Router();
 
-// Helper for session token simulation
 let activeSession = {
   user: null,
   loginTime: null,
@@ -21,7 +17,6 @@ let activeSession = {
 // ------------------------------------------------------------
 router.post('/auth/login', async (req, res) => {
   const { username, password, role, otp } = req.body;
-
   const users = await db.getUsers();
   let user = users.find(u => u.username === username || u.role === role);
 
@@ -36,7 +31,6 @@ router.post('/auth/login', async (req, res) => {
     };
   }
 
-  // OTP check for demo
   if (otp && otp !== '123456') {
     return res.status(400).json({ error: 'Invalid OTP code. For demo, use 123456.' });
   }
@@ -74,21 +68,20 @@ router.get('/auth/me', (req, res) => {
 // ------------------------------------------------------------
 // 2. DASHBOARD & SYSTEM MONITORING APIs
 // ------------------------------------------------------------
-router.get('/dashboard', async (req, res) => {
+router.get(['/dashboard', '/api/dashboard'], async (req, res) => {
   const files = await db.getFiles();
   const records = await db.getRecords();
-  const govmeshReqs = await db.getGovMeshRequests();
   const exceptions = await db.getExceptions();
   const transfers = await db.getTransfers();
   const systemHealth = await db.getSystemHealth();
   const demoControls = await db.getDemoControls();
 
-  const filesReceivedToday = files.length + govmeshReqs.length;
+  const filesReceivedToday = files.length + records.length;
   const recordsImported = records.length;
-  const pendingApplications = govmeshReqs.filter(r => r.status === 'RECEIVED' || r.status === 'VALIDATING' || r.status === 'ACCEPTED').length + exceptions.filter(e => e.status === 'Pending').length;
-  const processingCount = govmeshReqs.filter(r => r.status === 'PROCESSING').length;
-  const completedCount = govmeshReqs.filter(r => r.status === 'COMPLETED').length + records.filter(r => r.status === 'Completed').length;
-  const rejectedCount = govmeshReqs.filter(r => r.status === 'REJECTED').length;
+  const pendingApplications = records.filter(r => (r.status || 'RECEIVED').toUpperCase() === 'RECEIVED' || (r.status || '').toUpperCase() === 'UNDER_REVIEW').length;
+  const processingCount = records.filter(r => (r.status || '').toUpperCase() === 'UNDER_REVIEW').length;
+  const completedCount = records.filter(r => (r.status || '').toUpperCase() === 'APPROVED' || (r.status || '').toUpperCase() === 'COMPLETED').length;
+  const rejectedCount = records.filter(r => (r.status || '').toUpperCase() === 'REJECTED' || (r.status || '').toUpperCase() === 'FAILED').length;
   const invalidRecordsCount = exceptions.length;
   const failedTransfersCount = transfers.filter(t => t.status === 'FAILED').length;
 
@@ -102,750 +95,517 @@ router.get('/dashboard', async (req, res) => {
       rejected: rejectedCount,
       invalidRecords: invalidRecordsCount,
       failedTransfers: failedTransfersCount,
-      govmeshRequestsCount: govmeshReqs.length
+      govmeshRequestsCount: records.length
     },
     legacyConnector: {
       status: demoControls?.simulateSftpFailure ? 'OFFLINE / ERROR' : 'ONLINE',
       type: 'SFTP / CSV File Connector',
-      lastTransfer: '10:18 AM',
-      lastFile: files[0]?.fileName || 'GM_2026_000124.csv',
-      pendingFiles: 2
+      lastTransfer: records[0]?.receivedDate || 'N/A',
+      lastFile: files[0]?.fileName || 'N/A',
+      pendingFiles: 0
     },
     systemHealth,
     demoControls
   });
 });
 
-// ------------------------------------------------------------
-// 3. FILE INGESTION & MANAGEMENT APIs
-// ------------------------------------------------------------
-router.get('/files', async (req, res) => {
-  const files = await db.getFiles();
-  res.json(files);
-});
-
-router.get('/files/:id', async (req, res) => {
-  const { id } = req.params;
-  const files = await db.getFiles();
-  const file = files.find(f => f.id === id || f.fileName === id);
-
-  if (!file) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  let parsedCsv;
-  if (file.csvContent) {
-    parsedCsv = sftpSimulator.parseCSVString(file.csvContent);
-  } else {
-    try {
-      const incomingPath = sftpSimulator.getSafeSftpPath('mock_sftp/incoming', file.fileName);
-      parsedCsv = sftpSimulator.readCSV(incomingPath);
-    } catch (e) {
-      parsedCsv = sftpSimulator.parseCSVString(null);
-    }
-  }
-
-  res.json({
-    file,
-    content: parsedCsv
-  });
-});
-
-router.post('/files/upload', async (req, res) => {
-  const fileId = `FILE-${Math.floor(100000 + Math.random() * 900000)}`;
-  const appId = `GM-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-  const fileName = `GM_2026_${Math.floor(100000 + Math.random() * 900000)}.csv`;
-
-  const newFileContent = `application_id,citizen_name,address,district,verified\n${appId},Demo Citizen,Gram Panchayat Ward No 2,Nashik,true`;
-  const checksum = sftpSimulator.calculateStringChecksum(newFileContent);
-
-  const newFile = {
-    id: fileId,
-    fileName,
-    applicationId: appId,
-    source: 'GovMesh Legacy Adapter',
-    receivedTime: new Date().toISOString(),
-    recordsCount: 1,
-    fileSize: `${newFileContent.length} B`,
-    fileType: 'CSV',
-    transferMethod: 'SFTP',
-    checksumAlg: 'SHA-256',
-    checksum,
-    senderChecksum: checksum,
-    integrityVerified: true,
-    status: 'RECEIVED',
-    manifest: {
-      application: appId,
-      consent: `CONSENT-${Math.floor(10000 + Math.random() * 90000)}`,
-      purpose: 'Rural service record update',
-      created: new Date().toISOString(),
-      checksum,
-      allowedFields: ['citizen_name', 'address', 'district', 'verified']
-    },
-    csvContent: newFileContent
-  };
-
-  await db.addFile(newFile);
-  await db.addAuditLog('FILE_RECEIVED', appId, fileId, 'SYSTEM', 'SUCCESS', checksum);
-
-  res.json({
-    success: true,
-    file: newFile
-  });
-});
-
-router.post('/files/:id/validate', async (req, res) => {
-  const { id } = req.params;
-  const files = await db.getFiles();
-  const file = files.find(f => f.id === id || f.fileName === id);
-
-  if (!file) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  let parsedCsv;
-  if (file.csvContent) {
-    parsedCsv = sftpSimulator.parseCSVString(file.csvContent);
-  } else {
-    try {
-      const incomingPath = sftpSimulator.getSafeSftpPath('mock_sftp/incoming', file.fileName);
-      parsedCsv = sftpSimulator.readCSV(incomingPath);
-    } catch (e) {
-      parsedCsv = sftpSimulator.parseCSVString(null);
-    }
-  }
-
-  const validationResult = validationEngine.validateFileSchema(parsedCsv, file.checksum, files);
-
-  const newStatus = validationResult.valid ? 'VALIDATING' : 'INVALID';
-  await db.updateFileStatus(file.id, newStatus);
-
-  await db.addAuditLog('VALIDATION_COMPLETED', file.applicationId, file.id, 'SYSTEM', validationResult.valid ? 'SUCCESS' : 'FAILED', file.checksum);
-
-  res.json({
-    fileId: file.id,
-    fileName: file.fileName,
-    validationResult
-  });
-});
-
-router.post('/files/:id/process', async (req, res) => {
-  const { id } = req.params;
-  const files = await db.getFiles();
-  const file = files.find(f => f.id === id || f.fileName === id);
-
-  if (!file) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  await db.updateFileStatus(file.id, 'PROCESSED');
-  file.status = 'PROCESSED';
-
-  const isBatch = file.recordsCount > 1;
-  const batchSummary = {
-    fileId: file.id,
-    fileName: file.fileName,
-    totalRecords: file.recordsCount,
-    valid: isBatch ? 96 : 1,
-    invalid: isBatch ? 4 : 0,
-    processed: isBatch ? 96 : 1,
-    rejected: isBatch ? 4 : 0,
-    status: 'COMPLETED'
-  };
-
-  await db.addAuditLog('RECORD_PROCESSED', file.applicationId, file.id, 'OFFICER-001', 'SUCCESS', file.checksum);
-
-  res.json({
-    success: true,
-    file,
-    batchSummary
-  });
-});
-
-router.post('/files/:id/generate-result', async (req, res) => {
-  const { id } = req.params;
-  const file = await db.getFile(id);
-
-  if (!file) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  const isBatch = file.recordsCount > 1;
-  const batchResults = isBatch ? [
-    { applicationId: 'GM-2026-000124', status: 'SUCCESS' },
-    { applicationId: 'GM-2026-000125', status: 'FAILED', errorCode: 'MISSING_DISTRICT', errorMessage: 'Required district field is missing' },
-    { applicationId: 'GM-2026-000126', status: 'SUCCESS' },
-    { applicationId: 'GM-2026-000127', status: 'SUCCESS' }
-  ] : [
-    { applicationId: file.applicationId, status: 'SUCCESS' }
-  ];
-
-  const resultFileInfo = sftpSimulator.generateResultCSV(file.fileName, batchResults);
-
-  await db.addAuditLog('RESULT_FILE_GENERATED', file.applicationId, file.id, 'SYSTEM', 'SUCCESS', file.checksum);
-
-  res.json({
-    success: true,
-    outputFileName: resultFileInfo.outputFileName,
-    csvContent: resultFileInfo.csvContent,
-    batchResults
-  });
-});
-
-router.post('/files/:id/send-to-govmesh', async (req, res) => {
-  const { id } = req.params;
-  const file = await db.getFile(id);
-
-  await db.addAuditLog('SENT_TO_GOVMESH', file ? file.applicationId : 'GM-2026-000124', id, 'SYSTEM', 'SUCCESS');
-
-  res.json({
-    success: true,
-    message: 'Result CSV successfully delivered to GovMesh orchestrator via legacy outbound connector.',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// ------------------------------------------------------------
-// 4. EXCEPTION QUEUE & OFFICER REVIEW APIs
-// ------------------------------------------------------------
-router.get('/exceptions', async (req, res) => {
-  const exceptions = await db.getExceptions();
-  res.json(exceptions);
-});
-
-router.post('/exceptions/:id/correct', async (req, res) => {
-  const { id } = req.params;
-  const { district, address } = req.body;
-  const exc = await db.correctException(id, district, address);
-
-  if (!exc) {
-    return res.status(404).json({ error: 'Exception record not found' });
-  }
-
-  await db.addAuditLog('CORRECTION_RECORDED', exc.applicationId, exc.fileId, 'OFFICER-001', 'SUCCESS');
-
-  res.json({
-    success: true,
-    message: 'Record correction saved successfully',
-    exception: exc
-  });
-});
-
-router.post('/exceptions/:id/reprocess', async (req, res) => {
-  const { id } = req.params;
-  const exc = await db.reprocessException(id);
-
-  if (!exc) {
-    return res.status(404).json({ error: 'Exception record not found' });
-  }
-
-  const newRecord = {
-    id: `REC-${Date.now()}`,
-    applicationId: exc.applicationId,
-    citizenRef: `CITIZEN-${Math.floor(100 + Math.random() * 900)}`,
-    citizenName: exc.citizenName,
-    address: exc.address || 'Gram Panchayat Road',
-    district: exc.district || 'Pune',
-    service: 'Local Rural Record Update',
-    receivedDate: exc.created || new Date().toISOString(),
-    status: 'Completed',
-    lastUpdated: new Date().toISOString(),
-    consentId: exc.consentId || 'CONSENT-00125',
-    verified: true
-  };
-  await db.addRecord(newRecord);
-
-  await db.addAuditLog('REPROCESS_SUCCESS', exc.applicationId, exc.fileId, 'OFFICER-001', 'SUCCESS');
-
-  res.json({
-    success: true,
-    message: 'Record successfully revalidated and reprocessed into Rural Service Records.',
-    exception: exc
-  });
-});
-
-// ------------------------------------------------------------
-// 5. FAILED TRANSFERS & AUDIT LOGS
-// ------------------------------------------------------------
-router.get('/transfers/failed', async (req, res) => {
-  const transfers = await db.getTransfers();
-  res.json(transfers);
-});
-
-router.post('/transfers/:id/retry', async (req, res) => {
-  const { id } = req.params;
-  const transfer = await db.retryTransfer(id);
-
-  if (!transfer) {
-    return res.status(404).json({ error: 'Transfer task not found' });
-  }
-
-  await db.addAuditLog('TRANSFER_RETRY_SUCCESS', transfer.fileName, transfer.id, 'SYSTEM', 'SUCCESS');
-
-  res.json({
-    success: true,
-    message: 'Retry attempt succeeded. File transferred to legacy SFTP.',
-    transfer
-  });
-});
-
-router.get('/records', async (req, res) => {
-  const records = await db.getRecords();
-  res.json(records);
-});
-
-router.get('/audit', async (req, res) => {
-  const auditLogs = await db.getAuditLogs();
-  res.json(auditLogs);
-});
-
-router.get('/system-health', async (req, res) => {
-  const systemHealth = await db.getSystemHealth();
-  res.json(systemHealth);
-});
-
-router.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'rural-development-department',
+router.get(['/health', '/rural/health', '/api/health', '/api/rural/health'], (req, res) => {
+  res.status(200).json({
+    status: 'UP',
+    service: 'RURAL_DEVELOPMENT',
     environment: process.env.NODE_ENV || 'production',
-    serverTime: new Date().toISOString()
+    version: process.env.DEPLOYMENT_VERSION || '1.0.0-realtime-v2'
   });
 });
 
 // ------------------------------------------------------------
-// 6. GOVMESH LIVE INTEROPERABILITY & INGRESS ENDPOINTS
+// 3. GOVMESH LIVE INTEROPERABILITY & INGRESS ENDPOINTS
 // ------------------------------------------------------------
-router.post(['/rural/address-update', '/govmesh/requests'], async (req, res) => {
+router.post(['/rural/address-update', '/api/rural/address-update', '/govmesh/requests', '/api/govmesh/requests'], async (req, res) => {
   try {
+    const correlationId = req.headers['x-correlation-id'] ||
+                          req.headers['x-govmesh-correlation-id'] ||
+                          req.body?.correlationId ||
+                          `CORR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    res.setHeader('X-Correlation-ID', correlationId);
+
     const demoControls = (await db.getDemoControls()) || {};
     if (demoControls.simulateSftpFailure) {
       return res.status(503).json({
         success: false,
         department: 'RURAL_DEVELOPMENT',
         status: 'FAILED',
-        errorCode: 'SERVICE_TEMPORARILY_UNAVAILABLE',
-        message: 'Rural Development server / SFTP connector is temporarily offline.'
+        error: {
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+          message: 'Rural Development server / SFTP connector is temporarily offline.'
+        },
+        correlationId
       });
     }
 
-    const ruralReceivedAt = new Date().toISOString();
     const body = req.body || {};
+    const appId = body.applicationId || body.appId || body.citizen?.applicationId;
+    const citizenId = body.citizenId || body.citizenRef || body.citizen?.citizenRef || body.citizen?.id;
+    const name = body.name || body.citizenName || body.citizen?.name;
+    const rawAddress = body.address || body.citizen?.address;
 
-    const applicationId = body.applicationId || body.appId || `GM-2026-${Math.floor(100000 + Math.random() * 900000)}`;
-    const correlationId = body.correlationId || `CORR-26-${Date.now()}`;
-    const requestVersion = parseInt(body.requestVersion || 1, 10);
-    const requestType = body.requestType || 'ADDRESS_CHANGE';
-    const serviceCode = body.serviceCode || 'ADDRESS_CHANGE';
-    const sourceDepartment = body.sourceDepartment || 'GovMesh Core';
-    const targetDepartment = 'Rural Development & Panchayat Raj';
-
-    // Citizen data extraction
-    const citizen = body.citizen || {};
-    const citizenRef = body.citizenRef || body.citizenId || citizen.citizenRef || citizen.id || `GM-CIT-${Math.floor(10000 + Math.random() * 90000)}`;
-    const citizenName = body.citizenName || citizen.name || body.name || 'Demo Citizen';
-
-    const rawAddress = citizen.address || body.address || {};
-    const requestedAddress = typeof rawAddress === 'string'
-      ? rawAddress
-      : (rawAddress.line1 || rawAddress.line || body.requestedAddress || 'Gram Panchayat Ward No. 4, Village Khed');
-    const currentAddress = rawAddress.currentAddress || body.currentAddress || 'Gram Panchayat Quarters, Khed';
-    const district = typeof rawAddress === 'object' ? (rawAddress.district || 'Pune') : (body.district || 'Pune');
-    const taluka = typeof rawAddress === 'object' ? (rawAddress.taluka || 'Khed') : (body.taluka || 'Khed');
-    const state = typeof rawAddress === 'object' ? (rawAddress.state || 'Maharashtra') : (body.state || 'Maharashtra');
-    const pincode = typeof rawAddress === 'object' ? (rawAddress.pincode || '410501') : (body.pincode || '410501');
-
-    const consentId = body.consentId || `CONSENT-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    // Cryptographic hash calculation / verification
-    let canonicalRequestHash = body.canonicalRequestHash || '';
-    if (!canonicalRequestHash) {
-      const canonicalString = `${applicationId}|${correlationId}|${serviceCode}|${citizenRef}|${citizenName}|${requestedAddress}|${district}`;
-      canonicalRequestHash = `sha256:${crypto.createHash('sha256').update(canonicalString).digest('hex')}`;
+    // Strict validation
+    if (!appId || !citizenId || !name || !rawAddress) {
+      return res.status(400).json({
+        success: false,
+        department: 'RURAL_DEVELOPMENT',
+        status: 'REJECTED',
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Missing required application fields: applicationId, citizenId, name, and address are mandatory.'
+        },
+        correlationId
+      });
     }
 
-    const documentHash = body.documentHash || body.document?.hash || body.document?.checksum || 'sha256:a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e';
-    const hashStatus = 'VERIFIED';
+    // Format address
+    let addressStr = '';
+    let addressObj = {};
+    let district = 'Pune';
+    let state = 'Maharashtra';
 
-    const documentId = body.document?.documentId || body.documentId || `DOC-RURAL-${Math.floor(100 + Math.random() * 900)}`;
-    const documentName = body.document?.documentName || body.documentName || 'address_proof.pdf';
-    const documentType = body.document?.documentType || body.documentType || 'application/pdf';
-    const documentSize = body.document?.documentSize || body.documentSize || '142 KB';
+    if (typeof rawAddress === 'string') {
+      addressStr = rawAddress;
+      district = body.district || 'Pune';
+      state = body.state || 'Maharashtra';
+      addressObj = { line1: addressStr, district, state };
+    } else if (typeof rawAddress === 'object') {
+      addressObj = rawAddress;
+      district = rawAddress.district || body.district || 'Pune';
+      state = rawAddress.state || body.state || 'Maharashtra';
+      addressStr = [rawAddress.line1, rawAddress.line2, rawAddress.city, district, state, rawAddress.pincode].filter(Boolean).join(', ');
+    }
 
-    const createdAt = body.createdAt || new Date(Date.now() - 5000).toISOString();
-    const sentAt = body.sentAt || new Date(Date.now() - 2000).toISOString();
-    const acknowledgementId = `ACK-RURAL-${applicationId}`;
-
-    // Check if request already exists (Idempotent deduplication)
-    const existingReq = await db.getGovMeshRequest(applicationId);
-    if (existingReq) {
+    // Idempotency check
+    const existing = await db.getRecordByAppIdOrDeptId(appId);
+    if (existing) {
       return res.status(200).json({
         success: true,
         department: 'RURAL_DEVELOPMENT',
-        departmentApplicationId: existingReq.id,
-        applicationId: existingReq.applicationId,
-        correlationId: existingReq.correlationId,
-        acknowledgementId: existingReq.acknowledgementId || acknowledgementId,
-        status: existingReq.status,
-        receivedAt: existingReq.receivedAt,
-        hashStatus: existingReq.hashStatus,
-        canonicalRequestHash: existingReq.canonicalRequestHash,
-        documentHash: existingReq.documentHash,
-        evidenceDisclaimer: 'Document binary retained in GovMesh Evidence Store. Rural Department verified document integrity using SHA-256.',
-        message: 'Idempotent request recognized. Existing Rural Development state returned.',
-        record: existingReq
+        applicationId: existing.applicationId,
+        departmentApplicationId: existing.departmentApplicationId || existing.id,
+        status: existing.status || 'RECEIVED',
+        message: 'Application already received and registered in Rural Development datastore',
+        correlationId
       });
     }
 
-    const ruralReqObj = {
-      id: `RURAL-REQ-${Date.now()}`,
-      applicationId,
-      correlationId,
-      requestVersion,
-      requestType,
-      serviceCode,
-      sourceDepartment,
-      targetDepartment,
-      citizenRef,
-      citizenName,
-      requestedAddress,
-      currentAddress,
+    const departmentApplicationId = `RD-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    const now = new Date().toISOString();
+    const consentId = body.consentId || `CONSENT-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    const newRecord = {
+      id: `REC-${Date.now()}`,
+      applicationId: appId,
+      departmentApplicationId,
+      citizenRef: citizenId,
+      citizenId,
+      citizenName: name,
+      name,
+      address: addressStr,
+      addressObj,
       district,
-      taluka,
       state,
-      pincode,
-      consentId,
-      canonicalRequestHash,
-      documentHash,
-      hashStatus,
-      documentId,
-      documentName,
-      documentType,
-      documentSize,
-      acknowledgementId,
+      service: 'Gram Panchayat Address Update',
+      receivedDate: now,
+      receivedAt: now,
       status: 'RECEIVED',
-      createdAt,
-      sentAt,
-      receivedAt: ruralReceivedAt,
-      validatedAt: null,
-      acceptedAt: null,
-      processingStartedAt: null,
-      completedAt: null,
-      officerRemarks: '',
-      reviewedBy: 'Rajesh Patil (Rural Development Officer)',
-      rawSourceJson: JSON.stringify(body, null, 2)
-    };
-
-    await db.addGovMeshRequest(ruralReqObj);
-
-    // Also register in rural records
-    const recordObj = {
-      id: `REC-RURAL-${Date.now()}`,
-      applicationId,
-      citizenRef,
-      citizenName,
-      address: requestedAddress,
-      district,
-      service: 'GovMesh Address Synchronisation (Gram Panchayat)',
-      receivedDate: ruralReceivedAt,
-      status: 'Received',
-      lastUpdated: ruralReceivedAt,
+      lastUpdated: now,
+      updatedAt: now,
       consentId,
-      verified: true
+      verified: true,
+      correlationId
     };
-    await db.addRecord(recordObj);
 
-    await db.addAuditLog('GOVMESH_INGRESS_RECEIVED', applicationId, ruralReqObj.id, 'SYSTEM', 'SUCCESS', canonicalRequestHash);
-    await db.addAuditLog('SHA256_INTEGRITY_VERIFIED', applicationId, ruralReqObj.id, 'SYSTEM', 'VERIFIED', documentHash);
+    await db.addRecord(newRecord);
+    await db.addAuditLog('APPLICATION_RECEIVED', appId, departmentApplicationId, 'SYSTEM', 'SUCCESS', `CORR:${correlationId}`);
 
-    res.status(200).json({
+    return res.status(202).json({
       success: true,
       department: 'RURAL_DEVELOPMENT',
-      departmentApplicationId: ruralReqObj.id,
-      applicationId,
-      correlationId,
-      acknowledgementId,
+      applicationId: appId,
+      departmentApplicationId,
       status: 'RECEIVED',
-      receivedAt: ruralReceivedAt,
-      hashStatus: 'VERIFIED',
-      canonicalRequestHash,
-      documentHash,
-      evidenceDisclaimer: 'Document binary retained in GovMesh Evidence Store. Rural Department verified document integrity using SHA-256.',
-      message: 'Rural Development Department successfully received and acknowledged request with verified SHA-256 integrity.',
-      record: ruralReqObj
+      message: 'Application received and queued for officer review',
+      correlationId
     });
   } catch (err) {
-    console.error('[Rural API Ingress Error]', err);
-    res.status(500).json({
+    console.error('[RURAL] Ingress error:', err);
+    return res.status(500).json({
       success: false,
-      message: err.message || 'Rural Development processing error'
+      status: 'FAILED',
+      error: { code: 'INTERNAL_PROCESSING_ERROR', message: err.message }
     });
   }
 });
 
 // ------------------------------------------------------------
-// 7. GOVMESH REQUEST OFFICER LIFECYCLE MANAGEMENT ENDPOINTS
+// 4. APPLICATION QUERY & STATUS LOOKUP ENDPOINTS
 // ------------------------------------------------------------
-router.get(['/rural/govmesh-requests', '/govmesh/requests'], async (req, res) => {
+router.get(['/rural/applications', '/api/rural/applications', '/records', '/api/records'], async (req, res) => {
   try {
-    const requests = await db.getGovMeshRequests();
-    res.json(requests);
+    const { status } = req.query;
+    const records = await db.getRecords(status ? String(status) : null);
+
+    // If calling /api/records or /records, return array directly for frontend compatibility
+    if (req.path.includes('/records')) {
+      return res.json(records);
+    }
+
+    res.json({
+      success: true,
+      count: records.length,
+      applications: records
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get([
+  '/rural/application/:id',
+  '/api/rural/application/:id',
+  '/govmesh/requests/:id',
+  '/api/govmesh/requests/:id',
+  '/rural/govmesh-requests/:id',
+  '/api/rural/govmesh-requests/:id'
+], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const correlationId = req.headers['x-correlation-id'] || req.headers['x-govmesh-correlation-id'];
+    if (correlationId) {
+      res.setHeader('X-Correlation-ID', correlationId);
+    }
+
+    const record = await db.getRecordByAppIdOrDeptId(id);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        status: 'FAILED',
+        error: { code: 'NOT_FOUND', message: `No application found matching ID: ${id}` }
+      });
+    }
+
+    const appObj = {
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      citizenId: record.citizenRef || record.citizenId,
+      name: record.citizenName || record.name,
+      address: record.addressObj || { line1: record.address, district: record.district, state: record.state || 'Maharashtra' },
+      department: 'RURAL_DEVELOPMENT',
+      status: record.status || 'RECEIVED',
+      correlationId: record.correlationId || correlationId || 'N/A',
+      receivedAt: record.receivedDate || record.receivedAt,
+      updatedAt: record.lastUpdated || record.updatedAt,
+      rejectionReason: record.rejectionReason || null
+    };
+
+    res.status(200).json({
+      success: true,
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status || 'RECEIVED',
+      application: appObj,
+      record
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, status: 'FAILED', error: { code: 'INTERNAL_ERROR', message: err.message } });
+  }
+});
+
+// ------------------------------------------------------------
+// 5. MANUAL OFFICER WORKFLOW & DECISION ENDPOINTS
+// ------------------------------------------------------------
+router.post(['/rural/application/:id/review', '/api/rural/application/:id/review'], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const officerId = req.body?.officerId || 'OFFICER-001';
+    const record = await db.reviewRecord(id, officerId);
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Application not found: ${id}` } });
+    }
+
+    await db.addAuditLog('OFFICER_REVIEW_STARTED', record.applicationId, record.departmentApplicationId || record.id, officerId, 'SUCCESS');
+
+    res.json({
+      success: true,
+      department: 'RURAL_DEVELOPMENT',
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status,
+      message: 'Application placed under officer review'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_ACTION', message: err.message } });
+  }
+});
+
+router.post(['/rural/application/:id/approve', '/api/rural/application/:id/approve'], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const officerId = req.body?.officerId || 'OFFICER-001';
+    const record = await db.approveRecord(id, officerId);
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Application not found: ${id}` } });
+    }
+
+    await db.addAuditLog('OFFICER_APPROVED', record.applicationId, record.departmentApplicationId || record.id, officerId, 'SUCCESS');
+
+    res.json({
+      success: true,
+      department: 'RURAL_DEVELOPMENT',
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status,
+      message: 'Application approved successfully by officer'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_ACTION', message: err.message } });
+  }
+});
+
+router.post(['/rural/application/:id/reject', '/api/rural/application/:id/reject'], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, officerId } = req.body || {};
+
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_REASON', message: 'Rejection reason is required' }
+      });
+    }
+
+    const record = await db.rejectRecord(id, officerId || 'OFFICER-001', reason);
+
+    if (!record) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Application not found: ${id}` } });
+    }
+
+    await db.addAuditLog('OFFICER_REJECTED', record.applicationId, record.departmentApplicationId || record.id, officerId || 'OFFICER-001', 'REJECTED');
+
+    res.json({
+      success: true,
+      department: 'RURAL_DEVELOPMENT',
+      applicationId: record.applicationId,
+      departmentApplicationId: record.departmentApplicationId || record.id,
+      status: record.status,
+      reason,
+      message: 'Application rejected by officer'
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: { code: 'INVALID_ACTION', message: err.message } });
+  }
+});
+
+// GovMesh alias endpoints
+router.get(['/rural/govmesh-requests', '/api/rural/govmesh-requests'], async (req, res) => {
+  try {
+    const records = await db.getRecords();
+    res.json(records);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get(['/rural/govmesh-requests/:id', '/rural/application/:id', '/govmesh/requests/:id'], async (req, res) => {
+router.post(['/rural/govmesh-requests/:id/validate', '/api/rural/govmesh-requests/:id/validate'], async (req, res) => {
   try {
     const { id } = req.params;
-    const request = await db.getGovMeshRequest(id);
-
-    if (request) {
-      return res.json({
-        success: true,
-        applicationId: request.applicationId,
-        departmentApplicationId: request.id,
-        status: request.status,
-        record: request
-      });
-    }
-
-    // Fallback to records
-    const records = await db.getRecords();
-    const record = records.find(r => r.applicationId === id || r.id === id);
-    if (!record) {
-      return res.status(404).json({
-        success: false,
-        message: `No rural development record found matching ID: ${id}`
-      });
-    }
-
-    res.json({
-      success: true,
-      applicationId: record.applicationId,
-      departmentApplicationId: record.id,
-      status: (record.status || 'COMPLETED').toUpperCase(),
-      record
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
+    const record = await db.reviewRecord(id, req.body.reviewedBy || 'OFFICER-001');
+    if (!record) return res.status(404).json({ success: false, message: 'Request not found' });
+    res.json({ success: true, status: record.status, request: record });
+  } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 });
 
-router.post(['/rural/govmesh-requests/:id/validate', '/govmesh/requests/:id/validate'], async (req, res) => {
+router.post(['/rural/govmesh-requests/:id/accept', '/api/rural/govmesh-requests/:id/accept'], async (req, res) => {
   try {
     const { id } = req.params;
-    const validatedAt = new Date().toISOString();
-    const officer = req.body.reviewedBy || 'Rajesh Patil (Rural Development Officer)';
-    const remarks = req.body.remarks || 'Cryptographic hashes and Gram Panchayat jurisdiction validated.';
-
-    const request = await db.updateGovMeshRequestStatus(id, 'VALIDATING', remarks, officer, { validatedAt });
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Request not found' });
-    }
-
-    await db.addAuditLog('OFFICER_VALIDATION_PASSED', request.applicationId, request.id, officer, 'SUCCESS', request.canonicalRequestHash);
-
-    // Asynchronous dispatch to GovMesh Core status callback
-    sendGovMeshStatusCallback({
-      applicationId: request.applicationId,
-      correlationId: request.correlationId,
-      status: 'VALIDATING',
-      acknowledgementId: request.acknowledgementId,
-      timestamp: validatedAt,
-      remarks,
-      reviewedBy: officer
-    }).catch(e => console.warn('[Rural Callback Error]', e.message));
-
-    res.json({
-      success: true,
-      status: 'VALIDATING',
-      validatedAt,
-      message: 'GovMesh request validated successfully by Rural Officer.',
-      request
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    const record = await db.reviewRecord(id, req.body.reviewedBy || 'OFFICER-001');
+    if (!record) return res.status(404).json({ success: false, message: 'Request not found' });
+    res.json({ success: true, status: record.status, request: record });
+  } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 });
 
-router.post(['/rural/govmesh-requests/:id/accept', '/govmesh/requests/:id/accept'], async (req, res) => {
+router.post(['/rural/govmesh-requests/:id/complete', '/api/rural/govmesh-requests/:id/complete'], async (req, res) => {
   try {
     const { id } = req.params;
-    const acceptedAt = new Date().toISOString();
-    const officer = req.body.reviewedBy || 'Rajesh Patil (Rural Development Officer)';
-    const remarks = req.body.remarks || 'Accepted into Rural Development address amendment workflow.';
-
-    const request = await db.updateGovMeshRequestStatus(id, 'ACCEPTED', remarks, officer, { acceptedAt });
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Request not found' });
-    }
-
-    await db.addAuditLog('OFFICER_ACCEPTED', request.applicationId, request.id, officer, 'SUCCESS');
-
-    sendGovMeshStatusCallback({
-      applicationId: request.applicationId,
-      correlationId: request.correlationId,
-      status: 'ACCEPTED',
-      acknowledgementId: request.acknowledgementId,
-      timestamp: acceptedAt,
-      remarks,
-      reviewedBy: officer
-    }).catch(e => console.warn('[Rural Callback Error]', e.message));
-
-    res.json({
-      success: true,
-      status: 'ACCEPTED',
-      acceptedAt,
-      message: 'GovMesh request accepted by Rural Development Officer.',
-      request
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.post(['/rural/govmesh-requests/:id/start-processing', '/govmesh/requests/:id/start-processing'], async (req, res) => {
-  try {
-    const { id } = req.params;
-    const processingStartedAt = new Date().toISOString();
-    const officer = req.body.reviewedBy || 'Rajesh Patil (Rural Development Officer)';
-    const remarks = req.body.remarks || 'Updating local Gram Panchayat registrar records.';
-
-    const request = await db.updateGovMeshRequestStatus(id, 'PROCESSING', remarks, officer, { processingStartedAt });
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Request not found' });
-    }
-
-    await db.addAuditLog('OFFICER_PROCESSING_STARTED', request.applicationId, request.id, officer, 'SUCCESS');
-
-    sendGovMeshStatusCallback({
-      applicationId: request.applicationId,
-      correlationId: request.correlationId,
-      status: 'PROCESSING',
-      acknowledgementId: request.acknowledgementId,
-      timestamp: processingStartedAt,
-      remarks,
-      reviewedBy: officer
-    }).catch(e => console.warn('[Rural Callback Error]', e.message));
-
-    res.json({
-      success: true,
-      status: 'PROCESSING',
-      processingStartedAt,
-      message: 'Rural Development processing in progress.',
-      request
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.post(['/rural/govmesh-requests/:id/complete', '/govmesh/requests/:id/complete'], async (req, res) => {
-  try {
-    const { id } = req.params;
-    const completedAt = new Date().toISOString();
-    const officer = req.body.reviewedBy || 'Rajesh Patil (Rural Development Officer)';
-    const remarks = req.body.remarks || 'Address synchronized in Gram Panchayat register and rural citizen directory.';
-
-    const request = await db.updateGovMeshRequestStatus(id, 'COMPLETED', remarks, officer, { completedAt });
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Request not found' });
-    }
-
-    // Update records
-    const records = await db.getRecords();
-    const rec = records.find(r => r.applicationId === request.applicationId);
-    if (rec) {
-      rec.status = 'Completed';
-      rec.lastUpdated = completedAt;
-    }
-
-    await db.addAuditLog('OFFICER_COMPLETED', request.applicationId, request.id, officer, 'SUCCESS');
-
-    sendGovMeshStatusCallback({
-      applicationId: request.applicationId,
-      correlationId: request.correlationId,
-      status: 'COMPLETED',
-      acknowledgementId: request.acknowledgementId,
-      timestamp: completedAt,
-      remarks,
-      reviewedBy: officer
-    }).catch(e => console.warn('[Rural Callback Error]', e.message));
-
-    res.json({
-      success: true,
-      status: 'COMPLETED',
-      completedAt,
-      message: 'GovMesh request processing completed successfully.',
-      request
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-router.post(['/rural/govmesh-requests/:id/reject', '/govmesh/requests/:id/reject'], async (req, res) => {
-  try {
-    const { id } = req.params;
-    const rejectedAt = new Date().toISOString();
-    const officer = req.body.reviewedBy || 'Rajesh Patil (Rural Development Officer)';
-    const remarks = req.body.remarks || req.body.reason || 'Record rejected due to jurisdictional discrepancy.';
-
-    const request = await db.updateGovMeshRequestStatus(id, 'REJECTED', remarks, officer, {});
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Request not found' });
-    }
-
-    await db.addAuditLog('OFFICER_REJECTED', request.applicationId, request.id, officer, 'REJECTED');
-
-    sendGovMeshStatusCallback({
-      applicationId: request.applicationId,
-      correlationId: request.correlationId,
-      status: 'REJECTED',
-      acknowledgementId: request.acknowledgementId,
-      timestamp: rejectedAt,
-      remarks,
-      reviewedBy: officer
-    }).catch(e => console.warn('[Rural Callback Error]', e.message));
-
-    res.json({
-      success: true,
-      status: 'REJECTED',
-      message: 'GovMesh request rejected by Rural Officer.',
-      request
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+    const record = await db.approveRecord(id, req.body.reviewedBy || 'OFFICER-001');
+    if (!record) return res.status(404).json({ success: false, message: 'Request not found' });
+    res.json({ success: true, status: record.status, request: record });
+  } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 });
 
 // ------------------------------------------------------------
-// 8. DEMO FAILURE CONTROLS & RESET
+// 6. LEGACY FILE INGESTION & BATCH APIs
 // ------------------------------------------------------------
-router.post('/demo/failure', async (req, res) => {
+router.get(['/files', '/api/files'], async (req, res) => {
+  const files = await db.getFiles();
+  res.json(files);
+});
+
+router.get(['/files/:id', '/api/files/:id'], async (req, res) => {
+  const { id } = req.params;
+  const files = await db.getFiles();
+  const file = files.find(f => f.id === id || f.fileName === id);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  let parsedCsv;
+  if (file.csvContent) {
+    parsedCsv = sftpSimulator.parseCSVString(file.csvContent);
+  } else {
+    parsedCsv = { headers: ['application_id', 'citizen_name', 'address', 'district', 'verified'], rows: [] };
+  }
+  res.json({ file, content: parsedCsv });
+});
+
+router.post(['/files/upload', '/api/files/upload'], async (req, res) => {
+  const demoControls = await db.getDemoControls();
+  let generated;
+
+  if (demoControls.simulateCorruptedFile) {
+    generated = sftpSimulator.generateCorruptedFile();
+  } else if (demoControls.simulateInvalidSchema) {
+    generated = sftpSimulator.generateInvalidSchemaFile();
+  } else if (demoControls.simulateMissingColumn) {
+    generated = sftpSimulator.generateMissingColumnFile();
+  } else {
+    generated = sftpSimulator.generateIncomingDemoFile();
+  }
+
+  const fileItem = {
+    id: `FILE-${Date.now().toString().slice(-6)}`,
+    fileName: generated.fileName,
+    applicationId: generated.manifest.application,
+    source: 'GovMesh Legacy SFTP Connector',
+    receivedTime: new Date().toISOString(),
+    recordsCount: generated.parsed.rows.length,
+    fileSize: `${(generated.csvContent.length / 1024).toFixed(1)} KB`,
+    fileType: 'CSV',
+    transferMethod: 'SFTP',
+    checksumAlg: 'SHA-256',
+    checksum: generated.checksum,
+    senderChecksum: generated.checksum,
+    integrityVerified: true,
+    status: 'RECEIVED',
+    manifest: generated.manifest,
+    csvContent: generated.csvContent
+  };
+
+  await db.addFile(fileItem);
+  await db.addAuditLog('FILE_RECEIVED', fileItem.applicationId, fileItem.id, 'SYSTEM', 'SUCCESS', fileItem.checksum);
+
+  res.json({ success: true, file: fileItem });
+});
+
+router.post(['/files/:id/validate', '/api/files/:id/validate'], async (req, res) => {
+  const { id } = req.params;
+  const file = await db.getFile(id);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  let parsed = file.csvContent
+    ? sftpSimulator.parseCSVString(file.csvContent)
+    : { headers: [], rows: [] };
+
+  const validationResult = validationEngine.runFullValidation(file, parsed);
+  await db.updateFileStatus(id, validationResult.valid ? 'VALIDATED' : 'INVALID');
+  await db.addAuditLog('FILE_VALIDATED', file.applicationId, file.id, 'SYSTEM', validationResult.valid ? 'SUCCESS' : 'FAILURE', file.checksum);
+
+  res.json({ success: true, validationResult });
+});
+
+router.post(['/files/:id/process', '/api/files/:id/process'], async (req, res) => {
+  const { id } = req.params;
+  const file = await db.getFile(id);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  await db.updateFileStatus(id, 'PROCESSED');
+  const batchSummary = {
+    fileId: file.id,
+    fileName: file.fileName,
+    processedTime: new Date().toISOString(),
+    totalRows: file.recordsCount || 1,
+    successfulImports: file.recordsCount || 1,
+    exceptionsCreated: 0
+  };
+
+  await db.addAuditLog('BATCH_PROCESSED', file.applicationId, file.id, 'SYSTEM', 'SUCCESS', file.checksum);
+  res.json({ success: true, batchSummary });
+});
+
+router.post(['/files/:id/send-to-govmesh', '/api/files/:id/send-to-govmesh'], async (req, res) => {
+  const { id } = req.params;
+  const file = await db.getFile(id);
+  if (!file) return res.status(404).json({ error: 'File not found' });
+
+  await db.updateFileStatus(id, 'COMPLETED');
+  await db.addAuditLog('EXPORTED_TO_GOVMESH', file.applicationId, file.id, 'SYSTEM', 'SUCCESS', file.checksum);
+  res.json({ success: true, message: 'Batch successfully synchronized with GovMesh Core' });
+});
+
+// ------------------------------------------------------------
+// 7. EXCEPTIONS, TRANSFERS, AUDIT & SYSTEM APIs
+// ------------------------------------------------------------
+router.get(['/exceptions', '/api/exceptions'], async (req, res) => {
+  const exceptions = await db.getExceptions();
+  res.json(exceptions);
+});
+
+router.post(['/exceptions/:id/correct', '/api/exceptions/:id/correct'], async (req, res) => {
+  const { id } = req.params;
+  const { district, address } = req.body;
+  const exc = await db.correctException(id, district, address);
+  await db.addAuditLog('EXCEPTION_CORRECTED', exc?.applicationId || id, exc?.fileId || 'N/A', 'OFFICER-001', 'SUCCESS');
+  res.json({ success: true, exception: exc });
+});
+
+router.post(['/exceptions/:id/reprocess', '/api/exceptions/:id/reprocess'], async (req, res) => {
+  const { id } = req.params;
+  const exc = await db.reprocessException(id);
+  await db.addAuditLog('EXCEPTION_REPROCESSED', exc?.applicationId || id, exc?.fileId || 'N/A', 'OFFICER-001', 'SUCCESS');
+  res.json({ success: true, exception: exc });
+});
+
+router.get(['/transfers/failed', '/api/transfers/failed'], async (req, res) => {
+  const transfers = await db.getTransfers();
+  res.json(transfers);
+});
+
+router.post(['/transfers/:id/retry', '/api/transfers/:id/retry'], async (req, res) => {
+  const { id } = req.params;
+  const transfer = await db.retryTransfer(id);
+  await db.addAuditLog('TRANSFER_RETRIED', 'N/A', id, 'OFFICER-001', 'SUCCESS');
+  res.json({ success: true, transfer });
+});
+
+router.get(['/audit', '/api/audit'], async (req, res) => {
+  const logs = await db.getAuditLogs();
+  res.json(logs);
+});
+
+router.get(['/system-health', '/api/system-health'], async (req, res) => {
+  const health = await db.getSystemHealth();
+  res.json(health);
+});
+
+router.post(['/demo/failure', '/api/demo/failure'], async (req, res) => {
   const { type, enabled } = req.body;
   const demoControls = await db.toggleDemoControl(type, enabled);
-
   await db.addAuditLog('DEMO_FAILURE_INJECTED', 'N/A', 'N/A', 'PRESENTER', `INJECTED_${type}`);
-
-  res.json({
-    success: true,
-    demoControls
-  });
+  res.json({ success: true, demoControls });
 });
 
-router.post('/demo/reset', async (req, res) => {
+router.post(['/demo/reset', '/api/demo/reset'], async (req, res) => {
   const resetData = await db.resetDemo();
   await db.addAuditLog('DEMO_ENVIRONMENT_RESET', 'ALL', 'ALL', 'PRESENTER', 'SUCCESS');
-  res.json({
-    success: true,
-    message: 'Demo environment reset to initial clean state',
-    data: resetData
-  });
+  res.json({ success: true, message: 'Demo environment reset', data: resetData });
 });
 
 export default router;

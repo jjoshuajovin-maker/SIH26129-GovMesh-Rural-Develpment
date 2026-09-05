@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { ServiceRecord } from '../types';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { Search, Filter, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { Search, Filter, FileSpreadsheet, CheckCircle2, ChevronRight, UserCheck } from 'lucide-react';
 
 interface ServiceRecordsPageProps {
   records: ServiceRecord[];
+  onSelectRecord?: (rec: ServiceRecord) => void;
   onNavigate: (page: string) => void;
 }
 
@@ -13,14 +14,15 @@ const MAHARASHTRA_DISTRICTS = [
   'Kolhapur', 'Satara', 'Solapur', 'Ahilyanagar', 'Nanded', 'Amravati'
 ];
 
-export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records, onNavigate }) => {
+export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records, onSelectRecord, onNavigate }) => {
   const [search, setSearch] = useState('');
   const [districtFilter, setDistrictFilter] = useState('All Districts');
 
   const filteredRecords = records.filter(r => {
-    const matchesSearch = r.applicationId.toLowerCase().includes(search.toLowerCase()) ||
-                          r.citizenName.toLowerCase().includes(search.toLowerCase()) ||
-                          r.address.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      r.applicationId.toLowerCase().includes(search.toLowerCase()) ||
+      r.citizenName.toLowerCase().includes(search.toLowerCase()) ||
+      r.address.toLowerCase().includes(search.toLowerCase());
     const matchesDistrict = districtFilter === 'All Districts' || r.district === districtFilter;
     return matchesSearch && matchesDistrict;
   });
@@ -36,7 +38,7 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
             Rural Local-Government Service Records
           </h2>
           <p className="text-xs text-slate-500 font-medium">
-            Searchable repository of verified Gram Panchayat address and local record updates across Maharashtra.
+            Authoritative repository of verified Gram Panchayat address and local citizen record updates across Maharashtra.
           </p>
         </div>
       </div>
@@ -75,39 +77,103 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px]">
                 <th className="p-3">Application ID</th>
-                <th className="p-3">Citizen Reference</th>
+                <th className="p-3">Department Ref</th>
+                <th className="p-3">Citizen Info</th>
                 <th className="p-3">District</th>
-                <th className="p-3">Service Name</th>
-                <th className="p-3">Gram Panchayat Address</th>
+                <th className="p-3">Address</th>
                 <th className="p-3">Received Date</th>
                 <th className="p-3">Status</th>
+                <th className="p-3 text-right">Officer Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRecords.map((rec) => (
-                <tr key={rec.id} className="hover:bg-slate-50 transition font-mono">
-                  <td className="p-3 font-bold text-gov-blue">{rec.applicationId}</td>
-                  <td className="p-3 font-sans font-semibold text-slate-900">{rec.citizenName} ({rec.citizenRef})</td>
-                  <td className="p-3 font-sans font-bold text-amber-700">{rec.district}</td>
-                  <td className="p-3 font-sans text-slate-700">{rec.service}</td>
-                  <td className="p-3 font-sans text-slate-600 truncate max-w-[200px]">{rec.address}</td>
-                  <td className="p-3 text-slate-500">{new Date(rec.receivedDate).toLocaleDateString()}</td>
-                  <td className="p-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center ${
-                      (rec.status === 'Completed' || rec.status === 'COMPLETED')
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : (rec.status === 'PROCESSING' || rec.status === 'In Progress')
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      <CheckCircle2 className={`w-3 h-3 mr-1 ${
-                        (rec.status === 'Completed' || rec.status === 'COMPLETED') ? 'text-emerald-600' : 'text-amber-600'
-                      }`} />
-                      {rec.status || 'Received'}
-                    </span>
+              {filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 font-sans text-xs">
+                    <div className="max-w-md mx-auto space-y-2">
+                      <FileSpreadsheet className="w-8 h-8 text-slate-400 mx-auto" />
+                      <div className="font-bold text-slate-700">No citizen applications received yet</div>
+                      <p className="text-slate-500 text-[11px]">
+                        Real applications submitted via GovMesh to <code className="bg-slate-100 px-1 py-0.5 rounded text-gov-blue">/api/rural/address-update</code> will appear here automatically.
+                      </p>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredRecords.map((rec) => {
+                  const st = (rec.status || 'RECEIVED').toUpperCase();
+                  let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                  if (st === 'UNDER_REVIEW') badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
+                  else if (st === 'APPROVED' || st === 'COMPLETED') badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                  else if (st === 'REJECTED' || st === 'FAILED') badgeClass = 'bg-red-100 text-red-800 border-red-300';
+
+                  return (
+                    <tr key={rec.id} className="hover:bg-slate-50 transition font-mono">
+                      <td className="p-3 font-bold text-gov-blue">
+                        <button
+                          onClick={() => {
+                            if (onSelectRecord) {
+                              onSelectRecord(rec);
+                              onNavigate('officer-review');
+                            }
+                          }}
+                          className="hover:underline flex items-center space-x-1"
+                        >
+                          <span>{rec.applicationId}</span>
+                          <ChevronRight className="w-3 h-3 text-slate-400" />
+                        </button>
+                      </td>
+                      <td className="p-3 font-bold text-slate-600">{rec.departmentApplicationId || rec.id}</td>
+                      <td className="p-3 font-sans font-semibold text-slate-900">{rec.citizenName} ({rec.citizenRef})</td>
+                      <td className="p-3 font-sans font-bold text-amber-700">{rec.district}</td>
+                      <td className="p-3 font-sans text-slate-600 truncate max-w-[200px]">{rec.address}</td>
+                      <td className="p-3 text-slate-500">{new Date(rec.receivedDate || rec.receivedAt || Date.now()).toLocaleString()}</td>
+                      <td className="p-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center border ${badgeClass}`}>
+                          {st}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-sans">
+                        <div className="flex items-center justify-end space-x-1">
+                          <button
+                            onClick={() => {
+                              if (onSelectRecord) {
+                                onSelectRecord(rec);
+                                onNavigate('officer-review');
+                              }
+                            }}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] px-2 py-1 rounded border border-slate-300"
+                          >
+                            Review Case
+                          </button>
+                          {st === 'RECEIVED' && (
+                            <button
+                              onClick={async () => {
+                                await fetch(`/api/rural/application/${rec.applicationId}/review`, { method: 'POST' });
+                                window.location.reload();
+                              }}
+                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] px-2 py-1 rounded"
+                            >
+                              Review
+                            </button>
+                          )}
+                          {(st === 'UNDER_REVIEW' || st === 'RECEIVED') && (
+                            <button
+                              onClick={async () => {
+                                await fetch(`/api/rural/application/${rec.applicationId}/approve`, { method: 'POST' });
+                                window.location.reload();
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-2 py-1 rounded"
+                            >
+                              Approve
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
