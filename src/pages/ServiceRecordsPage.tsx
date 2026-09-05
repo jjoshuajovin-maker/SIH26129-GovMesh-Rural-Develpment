@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ServiceRecord } from '../types';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { Search, Filter, FileSpreadsheet, CheckCircle2, ChevronRight, UserCheck } from 'lucide-react';
+import { Search, Filter, FileSpreadsheet, CheckCircle2, ChevronRight, UserCheck, ShieldCheck, Sparkles } from 'lucide-react';
 
 interface ServiceRecordsPageProps {
   records: ServiceRecord[];
@@ -18,11 +18,21 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
   const [search, setSearch] = useState('');
   const [districtFilter, setDistrictFilter] = useState('All Districts');
 
-  const filteredRecords = records.filter(r => {
+  // Sort with GM-2026-000124 always at the top
+  const sortedRecords = [...records].sort((a, b) => {
+    if (a.applicationId === 'GM-2026-000124') return -1;
+    if (b.applicationId === 'GM-2026-000124') return 1;
+    const timeA = new Date(a.receivedDate || a.receivedAt || 0).getTime();
+    const timeB = new Date(b.receivedDate || b.receivedAt || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const filteredRecords = sortedRecords.filter(r => {
     const matchesSearch =
       r.applicationId.toLowerCase().includes(search.toLowerCase()) ||
       r.citizenName.toLowerCase().includes(search.toLowerCase()) ||
-      r.address.toLowerCase().includes(search.toLowerCase());
+      r.address.toLowerCase().includes(search.toLowerCase()) ||
+      (r.service || '').toLowerCase().includes(search.toLowerCase());
     const matchesDistrict = districtFilter === 'All Districts' || r.district === districtFilter;
     return matchesSearch && matchesDistrict;
   });
@@ -51,7 +61,7 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by Application ID, Citizen Name, or Address..."
+            placeholder="Search by Application ID, Citizen Name, Service, or Address..."
             className="pl-9 w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-gov-blue focus:border-gov-blue"
           />
         </div>
@@ -77,10 +87,10 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px]">
                 <th className="p-3">Application ID</th>
-                <th className="p-3">Department Ref</th>
+                <th className="p-3">Source &amp; Gateway</th>
                 <th className="p-3">Citizen Info</th>
                 <th className="p-3">District</th>
-                <th className="p-3">Address</th>
+                <th className="p-3">Service</th>
                 <th className="p-3">Received Date</th>
                 <th className="p-3">Status</th>
                 <th className="p-3 text-right">Officer Actions</th>
@@ -92,15 +102,16 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
                   <td colSpan={8} className="p-8 text-center text-slate-500 font-sans text-xs">
                     <div className="max-w-md mx-auto space-y-2">
                       <FileSpreadsheet className="w-8 h-8 text-slate-400 mx-auto" />
-                      <div className="font-bold text-slate-700">No citizen applications received yet</div>
+                      <div className="font-bold text-slate-700">No citizen applications match your criteria</div>
                       <p className="text-slate-500 text-[11px]">
-                        Real applications submitted via GovMesh to <code className="bg-slate-100 px-1 py-0.5 rounded text-gov-blue">/api/rural/address-update</code> will appear here automatically.
+                        Try resetting your search query or district filter.
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((rec) => {
+                  const isApp124 = rec.applicationId === 'GM-2026-000124';
                   const st = (rec.status || 'RECEIVED').toUpperCase();
                   let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
                   if (st === 'UNDER_REVIEW') badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
@@ -108,7 +119,12 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
                   else if (st === 'REJECTED' || st === 'FAILED') badgeClass = 'bg-red-100 text-red-800 border-red-300';
 
                   return (
-                    <tr key={rec.id} className="hover:bg-slate-50 transition font-mono">
+                    <tr
+                      key={rec.id}
+                      className={`transition font-mono ${
+                        isApp124 ? 'bg-amber-50/50 hover:bg-amber-50 border-l-4 border-l-amber-500' : 'hover:bg-slate-50'
+                      }`}
+                    >
                       <td className="p-3 font-bold text-gov-blue">
                         <button
                           onClick={() => {
@@ -117,17 +133,30 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
                               onNavigate('officer-review');
                             }
                           }}
-                          className="hover:underline flex items-center space-x-1"
+                          className="hover:underline flex flex-col items-start space-y-0.5"
                         >
-                          <span>{rec.applicationId}</span>
-                          <ChevronRight className="w-3 h-3 text-slate-400" />
+                          <span className="flex items-center space-x-1">
+                            <span>{rec.applicationId}</span>
+                            <ChevronRight className="w-3 h-3 text-slate-400" />
+                          </span>
+                          {isApp124 && (
+                            <span className="bg-amber-500 text-slate-950 font-sans text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center shadow-xs">
+                              <Sparkles className="w-2.5 h-2.5 mr-0.5" /> GovMesh Demo — Recently Received
+                            </span>
+                          )}
                         </button>
                       </td>
-                      <td className="p-3 font-bold text-slate-600">{rec.departmentApplicationId || rec.id}</td>
-                      <td className="p-3 font-sans font-semibold text-slate-900">{rec.citizenName} ({rec.citizenRef})</td>
+                      <td className="p-3 font-sans">
+                        <div className="font-bold text-slate-700 text-[11px]">{rec.source || 'GOVMESH'}</div>
+                        <div className="text-[9px] text-slate-500 font-mono">Gateway Ingress</div>
+                      </td>
+                      <td className="p-3 font-sans">
+                        <div className="font-semibold text-slate-900">{rec.citizenName}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{rec.citizenRef || rec.citizenId}</div>
+                      </td>
                       <td className="p-3 font-sans font-bold text-amber-700">{rec.district}</td>
-                      <td className="p-3 font-sans text-slate-600 truncate max-w-[200px]">{rec.address}</td>
-                      <td className="p-3 text-slate-500">{new Date(rec.receivedDate || rec.receivedAt || Date.now()).toLocaleString()}</td>
+                      <td className="p-3 font-sans text-slate-700 font-medium truncate max-w-[180px]">{rec.service || 'Rural Address Update'}</td>
+                      <td className="p-3 text-slate-500 text-[11px]">{new Date(rec.receivedDate || rec.receivedAt || Date.now()).toLocaleDateString()}</td>
                       <td className="p-3">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center border ${badgeClass}`}>
                           {st}
@@ -142,32 +171,10 @@ export const ServiceRecordsPage: React.FC<ServiceRecordsPageProps> = ({ records,
                                 onNavigate('officer-review');
                               }
                             }}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] px-2 py-1 rounded border border-slate-300"
+                            className="bg-gov-blue hover:bg-blue-800 text-white font-bold text-[10px] px-2.5 py-1 rounded shadow-xs"
                           >
                             Review Case
                           </button>
-                          {st === 'RECEIVED' && (
-                            <button
-                              onClick={async () => {
-                                await fetch(`/api/rural/application/${rec.applicationId}/review`, { method: 'POST' });
-                                window.location.reload();
-                              }}
-                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] px-2 py-1 rounded"
-                            >
-                              Review
-                            </button>
-                          )}
-                          {(st === 'UNDER_REVIEW' || st === 'RECEIVED') && (
-                            <button
-                              onClick={async () => {
-                                await fetch(`/api/rural/application/${rec.applicationId}/approve`, { method: 'POST' });
-                                window.location.reload();
-                              }}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-2 py-1 rounded"
-                            >
-                              Approve
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>

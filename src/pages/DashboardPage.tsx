@@ -68,7 +68,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Files Received</div>
-          <div className="text-xl font-extrabold text-slate-900 mt-1">{kpis?.filesReceivedToday || 8}</div>
+          <div className="text-xl font-extrabold text-slate-900 mt-1">{kpis?.filesReceivedToday ?? 0}</div>
           <div className="text-[10px] text-emerald-600 font-semibold mt-1">Today</div>
         </div>
 
@@ -77,26 +77,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Records Imported</div>
-          <div className="text-xl font-extrabold text-blue-900 mt-1">{kpis?.recordsImported || 124}</div>
-          <div className="text-[10px] text-blue-600 font-semibold mt-1">Validated & Seeded</div>
+          <div className="text-xl font-extrabold text-blue-900 mt-1">{kpis?.recordsImported ?? 0}</div>
+          <div className="text-[10px] text-blue-600 font-semibold mt-1">Seeded &amp; Live</div>
         </div>
 
         <div
-          onClick={() => onNavigate('records')}
+          onClick={() => onNavigate('officer-review')}
           className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pending Apps</div>
-          <div className="text-xl font-extrabold text-amber-600 mt-1">{kpis?.pendingApplications || 11}</div>
+          <div className="text-xl font-extrabold text-amber-600 mt-1">{kpis?.pendingApplications ?? 0}</div>
           <div className="text-[10px] text-amber-600 font-semibold mt-1">Awaiting Review</div>
         </div>
 
         <div
-          onClick={() => onNavigate('file-processing')}
+          onClick={() => onNavigate('officer-review')}
           className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Processing</div>
-          <div className="text-xl font-extrabold text-indigo-600 mt-1">{kpis?.processing || 7}</div>
-          <div className="text-[10px] text-indigo-600 font-semibold mt-1">Active Batch</div>
+          <div className="text-xl font-extrabold text-indigo-600 mt-1">{kpis?.processing ?? 0}</div>
+          <div className="text-[10px] text-indigo-600 font-semibold mt-1">Under Review</div>
         </div>
 
         <div
@@ -104,17 +104,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Completed</div>
-          <div className="text-xl font-extrabold text-emerald-600 mt-1">{kpis?.completed || 96}</div>
-          <div className="text-[10px] text-emerald-600 font-semibold mt-1">Success Result</div>
+          <div className="text-xl font-extrabold text-emerald-600 mt-1">{kpis?.completed ?? 0}</div>
+          <div className="text-[10px] text-emerald-600 font-semibold mt-1">Approved Cases</div>
         </div>
 
         <div
-          onClick={() => onNavigate('batch-results')}
+          onClick={() => onNavigate('records')}
           className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Rejected</div>
-          <div className="text-xl font-extrabold text-red-600 mt-1">{kpis?.rejected || 4}</div>
-          <div className="text-[10px] text-red-600 font-semibold mt-1">Failed Schema</div>
+          <div className="text-xl font-extrabold text-red-600 mt-1">{kpis?.rejected ?? 0}</div>
+          <div className="text-[10px] text-red-600 font-semibold mt-1">Rejected Cases</div>
         </div>
 
         <div
@@ -122,7 +122,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           className="bg-white p-3 rounded-lg border border-amber-300 bg-amber-50/40 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-amber-900">Invalid Records</div>
-          <div className="text-xl font-extrabold text-amber-700 mt-1">{kpis?.invalidRecords || 4}</div>
+          <div className="text-xl font-extrabold text-amber-700 mt-1">{kpis?.invalidRecords ?? 0}</div>
           <div className="text-[10px] text-amber-800 font-semibold mt-1">Exception Queue</div>
         </div>
 
@@ -131,7 +131,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           className="bg-white p-3 rounded-lg border border-red-200 bg-red-50/40 shadow-sm hover:shadow transition cursor-pointer"
         >
           <div className="text-[10px] font-bold uppercase tracking-wider text-red-900">Failed Transfers</div>
-          <div className="text-xl font-extrabold text-red-700 mt-1">{kpis?.failedTransfers || 1}</div>
+          <div className="text-xl font-extrabold text-red-700 mt-1">{kpis?.failedTransfers ?? 0}</div>
           <div className="text-[10px] text-red-800 font-semibold mt-1">Auto Retry Active</div>
         </div>
       </div>

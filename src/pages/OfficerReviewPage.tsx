@@ -19,7 +19,10 @@ import {
   ChevronRight,
   MapPin,
   Building2,
-  FileText
+  FileText,
+  Sparkles,
+  Layers,
+  Check
 } from 'lucide-react';
 
 interface OfficerReviewPageProps {
@@ -190,20 +193,29 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
   }
 
   // ---------------------------------------------------------
-  // 2. SPECIFIC APPLICATION RECORD REVIEW VIEW
+  // 2. SPECIFIC APPLICATION RECORD REVIEW VIEW (E.G. GM-2026-000124)
   // ---------------------------------------------------------
   if (selectedRecord) {
+    const isApp124 = selectedRecord.applicationId === 'GM-2026-000124';
     const st = (selectedRecord.status || 'RECEIVED').toUpperCase();
     let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
-    if (st === 'UNDER_REVIEW') badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
-    else if (st === 'APPROVED' || st === 'COMPLETED') badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    else if (st === 'REJECTED' || st === 'FAILED') badgeClass = 'bg-red-100 text-red-800 border-red-300';
+    let humanReviewStatus = 'PENDING';
+    if (st === 'UNDER_REVIEW') {
+      badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
+      humanReviewStatus = 'UNDER_REVIEW';
+    } else if (st === 'APPROVED' || st === 'COMPLETED') {
+      badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      humanReviewStatus = 'APPROVED';
+    } else if (st === 'REJECTED' || st === 'FAILED') {
+      badgeClass = 'bg-red-100 text-red-800 border-red-300';
+      humanReviewStatus = 'REJECTED';
+    }
 
     return (
       <div className="space-y-6">
         <Breadcrumbs
           items={[
-            { label: 'Rural Records', page: 'records' },
+            { label: 'Rural Review Queue', page: 'officer-review' },
             { label: `Officer Review: ${selectedRecord.applicationId}` }
           ]}
           onNavigate={onNavigate}
@@ -212,7 +224,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
         {/* Header with Officer Decision Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="bg-gov-blue text-amber-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded">
                 APPLICATION: {selectedRecord.applicationId}
               </span>
@@ -220,8 +232,16 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                 DEPT REF: {selectedRecord.departmentApplicationId || selectedRecord.id}
               </span>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badgeClass}`}>
-                {st}
+                STATUS: {st}
               </span>
+              <span className="bg-slate-100 text-slate-700 font-sans text-[10px] font-bold px-2 py-0.5 rounded border border-slate-300">
+                HUMAN REVIEW: {humanReviewStatus}
+              </span>
+              {isApp124 && (
+                <span className="bg-amber-500 text-slate-950 font-sans text-[10px] font-black px-2 py-0.5 rounded inline-flex items-center shadow-xs">
+                  <Sparkles className="w-3 h-3 mr-1" /> GovMesh Demo — Recently Received
+                </span>
+              )}
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight mt-1">
               Officer Case Review &amp; Official Approval
@@ -263,7 +283,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                     setActionLoading(true);
                     try {
                       await onApproveRecord(selectedRecord.applicationId);
-                      setActionMessage('Application APPROVED by Officer. Gram Panchayat register updated.');
+                      setActionMessage('Application APPROVED by Officer. Gram Panchayat registry updated.');
                     } finally {
                       setActionLoading(false);
                     }
@@ -284,6 +304,12 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                 </button>
               </>
             )}
+
+            {(st === 'APPROVED' || st === 'COMPLETED') && (
+              <span className="bg-emerald-50 text-emerald-800 text-xs font-bold px-3 py-2 rounded border border-emerald-300 flex items-center">
+                <Check className="w-4 h-4 mr-1 text-emerald-600" /> Authorized &amp; Approved by Officer
+              </span>
+            )}
           </div>
         </div>
 
@@ -293,6 +319,35 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
           </div>
         )}
 
+        {/* Workflow Progression Visualizer */}
+        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+            GovMesh Human-in-the-Loop Workflow Flowchart
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+            <span className="bg-blue-50 text-gov-blue px-2.5 py-1 rounded border border-blue-200">
+              1. Citizen Submission (GovMesh Portal)
+            </span>
+            <ArrowRight className="w-4 h-4 text-slate-400" />
+            <span className="bg-purple-50 text-purple-800 px-2.5 py-1 rounded border border-purple-200">
+              2. Rural Ingress Delivery (/api/rural/address-update)
+            </span>
+            <ArrowRight className="w-4 h-4 text-slate-400" />
+            <span className={`px-2.5 py-1 rounded border ${
+              st === 'RECEIVED' ? 'bg-amber-100 text-amber-900 border-amber-400 animate-pulse' : 'bg-slate-100 text-slate-700 border-slate-300'
+            }`}>
+              3. Officer Queue (RECEIVED)
+            </span>
+            <ArrowRight className="w-4 h-4 text-slate-400" />
+            <span className={`px-2.5 py-1 rounded border ${
+              st === 'UNDER_REVIEW' ? 'bg-purple-100 text-purple-900 border-purple-400 animate-pulse' :
+              st === 'APPROVED' ? 'bg-emerald-100 text-emerald-900 border-emerald-400' : 'bg-slate-100 text-slate-700 border-slate-300'
+            }`}>
+              4. Officer Decision (UNDER_REVIEW / APPROVED)
+            </span>
+          </div>
+        </div>
+
         {/* Detailed Panels */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Panel 1: Citizen & Application Information */}
@@ -300,15 +355,33 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b pb-2 flex items-center">
               <Building2 className="w-4 h-4 text-gov-blue mr-2" /> Application &amp; Citizen Information
             </h3>
-            <div className="grid grid-cols-2 gap-y-2 text-slate-600">
+            <div className="grid grid-cols-2 gap-y-2.5 text-slate-600">
+              <div><span className="font-semibold text-slate-900">Application ID:</span></div>
+              <div className="font-mono text-gov-blue font-bold">{selectedRecord.applicationId}</div>
+
+              <div><span className="font-semibold text-slate-900">Source:</span></div>
+              <div><span className="bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded border border-slate-200">{selectedRecord.source || (isApp124 ? 'GOVMESH — DEMO' : 'GOVMESH')}</span></div>
+
+              <div><span className="font-semibold text-slate-900">Received Through:</span></div>
+              <div className="font-semibold text-slate-800">{selectedRecord.gateway || 'GovMesh Interoperability Gateway'}</div>
+
+              <div><span className="font-semibold text-slate-900">Priority:</span></div>
+              <div>
+                <span className={`font-bold text-[10px] px-2 py-0.5 rounded ${
+                  selectedRecord.priority === 'HIGH' || isApp124 ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'
+                }`}>
+                  {selectedRecord.priority || (isApp124 ? 'HIGH' : 'Medium')}
+                </span>
+              </div>
+
               <div><span className="font-semibold text-slate-900">Citizen Name:</span></div>
               <div className="font-bold text-slate-900">{selectedRecord.citizenName}</div>
 
               <div><span className="font-semibold text-slate-900">Citizen Reference:</span></div>
-              <div className="font-mono text-slate-700">{selectedRecord.citizenRef}</div>
+              <div className="font-mono text-slate-700">{selectedRecord.citizenRef || selectedRecord.citizenId}</div>
 
               <div><span className="font-semibold text-slate-900">Service Category:</span></div>
-              <div>{selectedRecord.service || 'Gram Panchayat Address Update'}</div>
+              <div className="font-semibold text-slate-900">{selectedRecord.service || 'Rural Address Update'}</div>
 
               <div><span className="font-semibold text-slate-900">Assigned District:</span></div>
               <div className="font-bold text-amber-700">{selectedRecord.district || 'Pune'}</div>
@@ -316,7 +389,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
               <div><span className="font-semibold text-slate-900">State:</span></div>
               <div>{selectedRecord.state || 'Maharashtra'}</div>
 
-              <div><span className="font-semibold text-slate-900">Received Date / Time:</span></div>
+              <div><span className="font-semibold text-slate-900">Received At:</span></div>
               <div className="font-mono">{new Date(selectedRecord.receivedDate || selectedRecord.receivedAt || Date.now()).toLocaleString()}</div>
 
               <div><span className="font-semibold text-slate-900">Requested Address:</span></div>
@@ -331,9 +404,9 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
             <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 border-b border-slate-800 pb-2 flex items-center">
               <ShieldCheck className="w-4 h-4 text-amber-400 mr-2" /> Consent &amp; Cryptographic Verification
             </h3>
-            <div className="grid grid-cols-2 gap-y-2 text-slate-300">
+            <div className="grid grid-cols-2 gap-y-2.5 text-slate-300">
               <div><span className="text-slate-400">Consent Reference:</span></div>
-              <div className="font-mono text-amber-300 font-bold">{selectedRecord.consentId || 'CONSENT-GOVMESH-2026'}</div>
+              <div className="font-mono text-amber-300 font-bold">{selectedRecord.consentId || 'DEMO-CONSENT-124'}</div>
 
               <div><span className="text-slate-400">Consent Purpose:</span></div>
               <div>Cross-department address amendment</div>
@@ -342,10 +415,27 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
               <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">ACTIVE &amp; VALID</span></div>
 
               <div><span className="text-slate-400">Correlation ID:</span></div>
-              <div className="font-mono text-[10px] text-amber-300 truncate">{selectedRecord.correlationId || 'N/A'}</div>
+              <div className="font-mono text-[10px] text-amber-300 truncate">{selectedRecord.correlationId || 'DEMO-CORR-124'}</div>
 
               <div><span className="text-slate-400">Cryptographic Integrity:</span></div>
               <div><span className="bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-700">SHA-256 VERIFIED</span></div>
+
+              <div><span className="text-slate-400">Officer Decision:</span></div>
+              <div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                  st === 'APPROVED' ? 'bg-emerald-900 text-emerald-300' :
+                  st === 'REJECTED' ? 'bg-red-900 text-red-300' : 'bg-slate-800 text-amber-300'
+                }`}>
+                  {humanReviewStatus}
+                </span>
+              </div>
+
+              {selectedRecord.reviewedBy && (
+                <>
+                  <div className="text-slate-400">Reviewed By:</div>
+                  <div className="font-mono text-slate-200">{selectedRecord.reviewedBy}</div>
+                </>
+              )}
 
               {selectedRecord.rejectionReason && (
                 <>
@@ -403,8 +493,17 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
   // ---------------------------------------------------------
   // 3. OFFICER REVIEW QUEUE (DEFAULT VIEW WHEN NAVIGATING)
   // ---------------------------------------------------------
-  const pendingApps = records.filter(r => (r.status || 'RECEIVED').toUpperCase() === 'RECEIVED' || (r.status || '').toUpperCase() === 'UNDER_REVIEW');
-  const filteredRecords = records.filter(r => {
+  // Sort with GM-2026-000124 always at the top
+  const sortedRecords = [...records].sort((a, b) => {
+    if (a.applicationId === 'GM-2026-000124') return -1;
+    if (b.applicationId === 'GM-2026-000124') return 1;
+    const timeA = new Date(a.receivedDate || a.receivedAt || 0).getTime();
+    const timeB = new Date(b.receivedDate || b.receivedAt || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const pendingApps = sortedRecords.filter(r => (r.status || 'RECEIVED').toUpperCase() === 'RECEIVED' || (r.status || '').toUpperCase() === 'UNDER_REVIEW');
+  const filteredRecords = sortedRecords.filter(r => {
     const st = (r.status || 'RECEIVED').toUpperCase();
     const matchesFilter =
       statusFilter === 'ALL' ? true :
@@ -416,7 +515,8 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
     const matchesSearch =
       r.applicationId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.citizenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.address.toLowerCase().includes(searchQuery.toLowerCase());
+      r.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.service || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
@@ -507,7 +607,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by Application ID, Citizen Name, Address..."
+                placeholder="Search by Application ID, Citizen Name, Service, Address..."
                 className="pl-9 w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-gov-blue"
               />
             </div>
@@ -537,7 +637,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                     <th className="p-3">Application ID</th>
                     <th className="p-3">Citizen Name</th>
                     <th className="p-3">District</th>
-                    <th className="p-3">Address</th>
+                    <th className="p-3">Service</th>
                     <th className="p-3">Received Date</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Officer Actions</th>
@@ -551,13 +651,14 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                           <UserCheck className="w-8 h-8 text-slate-400 mx-auto" />
                           <div className="font-bold text-slate-700">No applications in this queue</div>
                           <p className="text-slate-500 text-[11px]">
-                            Real citizen applications submitted via GovMesh to <code className="bg-slate-100 px-1 py-0.5 rounded text-gov-blue">/api/rural/address-update</code> will appear here automatically for officer review.
+                            Try adjusting your filters or search query.
                           </p>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     filteredRecords.map((rec) => {
+                      const isApp124 = rec.applicationId === 'GM-2026-000124';
                       const st = (rec.status || 'RECEIVED').toUpperCase();
                       let badgeClass = 'bg-blue-100 text-blue-800 border-blue-300';
                       if (st === 'UNDER_REVIEW') badgeClass = 'bg-purple-100 text-purple-800 border-purple-300';
@@ -565,19 +666,31 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                       else if (st === 'REJECTED' || st === 'FAILED') badgeClass = 'bg-red-100 text-red-800 border-red-300';
 
                       return (
-                        <tr key={rec.id} className="hover:bg-slate-50 transition font-mono">
+                        <tr
+                          key={rec.id}
+                          className={`transition font-mono ${
+                            isApp124 ? 'bg-amber-50/50 hover:bg-amber-50 border-l-4 border-l-amber-500' : 'hover:bg-slate-50'
+                          }`}
+                        >
                           <td className="p-3 font-bold text-gov-blue">
                             <button
                               onClick={() => onSelectRecord(rec)}
-                              className="hover:underline flex items-center space-x-1"
+                              className="hover:underline flex flex-col items-start space-y-0.5"
                             >
-                              <span>{rec.applicationId}</span>
-                              <ChevronRight className="w-3 h-3 text-slate-400" />
+                              <span className="flex items-center space-x-1">
+                                <span>{rec.applicationId}</span>
+                                <ChevronRight className="w-3 h-3 text-slate-400" />
+                              </span>
+                              {isApp124 && (
+                                <span className="bg-amber-500 text-slate-950 font-sans text-[9px] font-black px-1.5 py-0.2 rounded inline-flex items-center shadow-xs">
+                                  <Sparkles className="w-2.5 h-2.5 mr-0.5" /> GovMesh Demo — Recently Received
+                                </span>
+                              )}
                             </button>
                           </td>
                           <td className="p-3 font-sans font-semibold text-slate-900">{rec.citizenName}</td>
                           <td className="p-3 font-sans font-bold text-amber-700">{rec.district}</td>
-                          <td className="p-3 font-sans text-slate-600 truncate max-w-[200px]">{rec.address}</td>
+                          <td className="p-3 font-sans text-slate-700 font-medium truncate max-w-[180px]">{rec.service || 'Rural Address Update'}</td>
                           <td className="p-3 text-slate-500">{new Date(rec.receivedDate || rec.receivedAt || Date.now()).toLocaleDateString()}</td>
                           <td className="p-3">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded inline-flex items-center border ${badgeClass}`}>
@@ -588,7 +701,7 @@ export const OfficerReviewPage: React.FC<OfficerReviewPageProps> = ({
                             <div className="flex items-center justify-end space-x-1">
                               <button
                                 onClick={() => onSelectRecord(rec)}
-                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] px-2 py-1 rounded border border-slate-300"
+                                className="bg-gov-blue hover:bg-blue-800 text-white font-bold text-[10px] px-2.5 py-1 rounded shadow-xs"
                               >
                                 View Case
                               </button>

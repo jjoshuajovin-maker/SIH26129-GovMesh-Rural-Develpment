@@ -12,7 +12,326 @@ const initialUsers = [
 ];
 
 const initialFiles = [];
-const initialRecords = [];
+const initialRecords = [
+  {
+    id: 'REC-000124',
+    applicationId: 'GM-2026-000124',
+    departmentApplicationId: 'RD-2026-000124',
+    citizenRef: 'CIT-DEMO-124',
+    citizenId: 'CIT-DEMO-124',
+    citizenName: 'Rural Demo Citizen 124',
+    name: 'Rural Demo Citizen 124',
+    address: 'Gram Panchayat Ward No. 4, Village Khed, Pune, Maharashtra',
+    addressObj: {
+      line1: 'Gram Panchayat Ward No. 4, Village Khed',
+      district: 'Pune',
+      state: 'Maharashtra'
+    },
+    district: 'Pune',
+    state: 'Maharashtra',
+    service: 'Rural Address Update',
+    receivedDate: '2026-09-05T08:30:00.000Z',
+    receivedAt: '2026-09-05T08:30:00.000Z',
+    status: 'RECEIVED',
+    lastUpdated: '2026-09-05T08:30:00.000Z',
+    updatedAt: '2026-09-05T08:30:00.000Z',
+    consentId: 'DEMO-CONSENT-124',
+    correlationId: 'DEMO-CORR-124',
+    verified: true,
+    priority: 'HIGH',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    description: 'Cross-department address amendment request submitted via GovMesh Citizen Portal',
+    isDemo: true
+  },
+  {
+    id: 'REC-000125',
+    applicationId: 'GM-2026-000125',
+    departmentApplicationId: 'RD-2026-000125',
+    citizenRef: 'CIT-DEMO-001',
+    citizenId: 'CIT-DEMO-001',
+    citizenName: 'Rural Demo Citizen 01',
+    name: 'Rural Demo Citizen 01',
+    address: 'House 14, Gram Panchayat Road, Village Dindori, Nashik, Maharashtra',
+    addressObj: {
+      line1: 'House 14, Gram Panchayat Road, Village Dindori',
+      district: 'Nashik',
+      state: 'Maharashtra'
+    },
+    district: 'Nashik',
+    state: 'Maharashtra',
+    service: 'Rural Housing Assistance',
+    receivedDate: '2026-09-05T07:45:00.000Z',
+    receivedAt: '2026-09-05T07:45:00.000Z',
+    status: 'UNDER_REVIEW',
+    lastUpdated: '2026-09-05T08:10:00.000Z',
+    updatedAt: '2026-09-05T08:10:00.000Z',
+    consentId: 'DEMO-CONSENT-001',
+    correlationId: 'DEMO-CORR-001',
+    verified: true,
+    priority: 'Medium',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-NASHIK-01',
+    description: 'Application for rural housing subsidy and village dwelling verification',
+    isDemo: true
+  },
+  {
+    id: 'REC-000126',
+    applicationId: 'GM-2026-000126',
+    departmentApplicationId: 'RD-2026-000126',
+    citizenRef: 'CIT-DEMO-002',
+    citizenId: 'CIT-DEMO-002',
+    citizenName: 'Rural Demo Citizen 02',
+    name: 'Rural Demo Citizen 02',
+    address: 'Sector 3, Gram Panchayat Square, Village Kalmeshwar, Nagpur, Maharashtra',
+    addressObj: {
+      line1: 'Sector 3, Gram Panchayat Square, Village Kalmeshwar',
+      district: 'Nagpur',
+      state: 'Maharashtra'
+    },
+    district: 'Nagpur',
+    state: 'Maharashtra',
+    service: 'Community Infrastructure Request',
+    receivedDate: '2026-09-05T06:20:00.000Z',
+    receivedAt: '2026-09-05T06:20:00.000Z',
+    status: 'APPROVED',
+    lastUpdated: '2026-09-05T07:15:00.000Z',
+    updatedAt: '2026-09-05T07:15:00.000Z',
+    consentId: 'DEMO-CONSENT-002',
+    correlationId: 'DEMO-CORR-002',
+    verified: true,
+    priority: 'High',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-NAGPUR-01',
+    approvedBy: 'OFFICER-NAGPUR-01',
+    description: 'Community drinking water connection and local Panchayat approval',
+    isDemo: true
+  },
+  {
+    id: 'REC-000127',
+    applicationId: 'GM-2026-000127',
+    departmentApplicationId: 'RD-2026-000127',
+    citizenRef: 'CIT-DEMO-003',
+    citizenId: 'CIT-DEMO-003',
+    citizenName: 'Rural Demo Citizen 03',
+    name: 'Rural Demo Citizen 03',
+    address: 'Main Bazaar, Village Panhala, Kolhapur, Maharashtra',
+    addressObj: {
+      line1: 'Main Bazaar, Village Panhala',
+      district: 'Kolhapur',
+      state: 'Maharashtra'
+    },
+    district: 'Kolhapur',
+    state: 'Maharashtra',
+    service: 'Village Development Assistance',
+    receivedDate: '2026-09-05T05:50:00.000Z',
+    receivedAt: '2026-09-05T05:50:00.000Z',
+    status: 'RECEIVED',
+    lastUpdated: '2026-09-05T05:50:00.000Z',
+    updatedAt: '2026-09-05T05:50:00.000Z',
+    consentId: 'DEMO-CONSENT-003',
+    correlationId: 'DEMO-CORR-003',
+    verified: true,
+    priority: 'Low',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    description: 'Panchayat cottage industry grant verification',
+    isDemo: true
+  },
+  {
+    id: 'REC-000128',
+    applicationId: 'GM-2026-000128',
+    departmentApplicationId: 'RD-2026-000128',
+    citizenRef: 'CIT-DEMO-004',
+    citizenId: 'CIT-DEMO-004',
+    citizenName: 'Rural Demo Citizen 04',
+    name: 'Rural Demo Citizen 04',
+    address: 'Old Fort Road, Village Wai, Satara, Maharashtra',
+    addressObj: {
+      line1: 'Old Fort Road, Village Wai',
+      district: 'Satara',
+      state: 'Maharashtra'
+    },
+    district: 'Satara',
+    state: 'Maharashtra',
+    service: 'Rural Beneficiary Verification',
+    receivedDate: '2026-09-04T18:30:00.000Z',
+    receivedAt: '2026-09-04T18:30:00.000Z',
+    status: 'UNDER_REVIEW',
+    lastUpdated: '2026-09-05T06:00:00.000Z',
+    updatedAt: '2026-09-05T06:00:00.000Z',
+    consentId: 'DEMO-CONSENT-004',
+    correlationId: 'DEMO-CORR-004',
+    verified: true,
+    priority: 'Medium',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-SATARA-01',
+    description: 'Gram Panchayat farmer welfare scheme beneficiary audit',
+    isDemo: true
+  },
+  {
+    id: 'REC-000129',
+    applicationId: 'GM-2026-000129',
+    departmentApplicationId: 'RD-2026-000129',
+    citizenRef: 'CIT-DEMO-005',
+    citizenName: 'Rural Demo Citizen 05',
+    name: 'Rural Demo Citizen 05',
+    address: 'Plot 88, Near Temple, Village Pandharpur, Solapur, Maharashtra',
+    addressObj: {
+      line1: 'Plot 88, Near Temple, Village Pandharpur',
+      district: 'Solapur',
+      state: 'Maharashtra'
+    },
+    district: 'Solapur',
+    state: 'Maharashtra',
+    service: 'Local Development Service',
+    receivedDate: '2026-09-04T16:15:00.000Z',
+    receivedAt: '2026-09-04T16:15:00.000Z',
+    status: 'APPROVED',
+    lastUpdated: '2026-09-04T19:20:00.000Z',
+    updatedAt: '2026-09-04T19:20:00.000Z',
+    consentId: 'DEMO-CONSENT-005',
+    correlationId: 'DEMO-CORR-005',
+    verified: true,
+    priority: 'High',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-SOLAPUR-01',
+    approvedBy: 'OFFICER-SOLAPUR-01',
+    description: 'Rural sanitation and drainage approval certificate',
+    isDemo: true
+  },
+  {
+    id: 'REC-000130',
+    applicationId: 'GM-2026-000130',
+    departmentApplicationId: 'RD-2026-000130',
+    citizenRef: 'CIT-DEMO-006',
+    citizenName: 'Rural Demo Citizen 06',
+    name: 'Rural Demo Citizen 06',
+    address: 'Ward 2, Village Sangamner, Ahilyanagar, Maharashtra',
+    addressObj: {
+      line1: 'Ward 2, Village Sangamner',
+      district: 'Ahilyanagar',
+      state: 'Maharashtra'
+    },
+    district: 'Ahilyanagar',
+    state: 'Maharashtra',
+    service: 'Rural Scheme Application',
+    receivedDate: '2026-09-04T14:10:00.000Z',
+    receivedAt: '2026-09-04T14:10:00.000Z',
+    status: 'RECEIVED',
+    lastUpdated: '2026-09-04T14:10:00.000Z',
+    updatedAt: '2026-09-04T14:10:00.000Z',
+    consentId: 'DEMO-CONSENT-006',
+    correlationId: 'DEMO-CORR-006',
+    verified: true,
+    priority: 'Medium',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    description: 'Panchayat solar electrification assistance application',
+    isDemo: true
+  },
+  {
+    id: 'REC-000131',
+    applicationId: 'GM-2026-000131',
+    departmentApplicationId: 'RD-2026-000131',
+    citizenRef: 'CIT-DEMO-007',
+    citizenName: 'Rural Demo Citizen 07',
+    name: 'Rural Demo Citizen 07',
+    address: 'Near Bus Stand, Village Achalpur, Amravati, Maharashtra',
+    addressObj: {
+      line1: 'Near Bus Stand, Village Achalpur',
+      district: 'Amravati',
+      state: 'Maharashtra'
+    },
+    district: 'Amravati',
+    state: 'Maharashtra',
+    service: 'Gram Panchayat Address Update',
+    receivedDate: '2026-09-04T11:45:00.000Z',
+    receivedAt: '2026-09-04T11:45:00.000Z',
+    status: 'UNDER_REVIEW',
+    lastUpdated: '2026-09-04T15:00:00.000Z',
+    updatedAt: '2026-09-04T15:00:00.000Z',
+    consentId: 'DEMO-CONSENT-007',
+    correlationId: 'DEMO-CORR-007',
+    verified: true,
+    priority: 'High',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-AMRAVATI-01',
+    description: 'Gram Panchayat residency re-allocation for agricultural census',
+    isDemo: true
+  },
+  {
+    id: 'REC-000132',
+    applicationId: 'GM-2026-000132',
+    departmentApplicationId: 'RD-2026-000132',
+    citizenRef: 'CIT-DEMO-008',
+    citizenName: 'Rural Demo Citizen 08',
+    name: 'Rural Demo Citizen 08',
+    address: 'Lane 5, Village Kandhar, Nanded, Maharashtra',
+    addressObj: {
+      line1: 'Lane 5, Village Kandhar',
+      district: 'Nanded',
+      state: 'Maharashtra'
+    },
+    district: 'Nanded',
+    state: 'Maharashtra',
+    service: 'Rural Housing Assistance',
+    receivedDate: '2026-09-04T09:20:00.000Z',
+    receivedAt: '2026-09-04T09:20:00.000Z',
+    status: 'REJECTED',
+    lastUpdated: '2026-09-04T12:00:00.000Z',
+    updatedAt: '2026-09-04T12:00:00.000Z',
+    consentId: 'DEMO-CONSENT-008',
+    correlationId: 'DEMO-CORR-008',
+    verified: true,
+    priority: 'Medium',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-NANDED-01',
+    rejectedBy: 'OFFICER-NANDED-01',
+    rejectionReason: 'Land survey certificate not matching local Gram Panchayat registry',
+    description: 'Housing reconstruction assistance application',
+    isDemo: true
+  },
+  {
+    id: 'REC-000133',
+    applicationId: 'GM-2026-000133',
+    departmentApplicationId: 'RD-2026-000133',
+    citizenRef: 'CIT-DEMO-009',
+    citizenName: 'Rural Demo Citizen 09',
+    name: 'Rural Demo Citizen 09',
+    address: 'Gram Panchayat Ward 1, Village Paithan, Chhatrapati Sambhajinagar, Maharashtra',
+    addressObj: {
+      line1: 'Gram Panchayat Ward 1, Village Paithan',
+      district: 'Chhatrapati Sambhajinagar',
+      state: 'Maharashtra'
+    },
+    district: 'Chhatrapati Sambhajinagar',
+    state: 'Maharashtra',
+    service: 'Village Development Assistance',
+    receivedDate: '2026-09-03T15:00:00.000Z',
+    receivedAt: '2026-09-03T15:00:00.000Z',
+    status: 'APPROVED',
+    lastUpdated: '2026-09-04T10:30:00.000Z',
+    updatedAt: '2026-09-04T10:30:00.000Z',
+    consentId: 'DEMO-CONSENT-009',
+    correlationId: 'DEMO-CORR-009',
+    verified: true,
+    priority: 'Low',
+    source: 'GOVMESH — DEMO',
+    gateway: 'GovMesh Interoperability Gateway',
+    reviewedBy: 'OFFICER-CSN-01',
+    approvedBy: 'OFFICER-CSN-01',
+    description: 'Panchayat rural artisan promotion scheme',
+    isDemo: true
+  }
+];
+
 const initialGovMeshRequests = [];
 const initialExceptions = [];
 const initialTransfers = [];
@@ -41,6 +360,16 @@ const initialDemoControls = {
   simulateMissingColumn: false,
   simulateDuplicateFile: false
 };
+
+function sortRecordsWith124Top(recordsList) {
+  return [...recordsList].sort((a, b) => {
+    if (a.applicationId === 'GM-2026-000124') return -1;
+    if (b.applicationId === 'GM-2026-000124') return 1;
+    const timeA = new Date(a.receivedDate || a.receivedAt || 0).getTime();
+    const timeB = new Date(b.receivedDate || b.receivedAt || 0).getTime();
+    return timeB - timeA;
+  });
+}
 
 class DataStore {
   constructor() {
@@ -78,31 +407,48 @@ class DataStore {
   loadFromFile() {
     try {
       const filePath = this.getStoreFilePath();
+      let loadedRecords = null;
+      let loadedData = null;
+
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf8');
-        const loaded = JSON.parse(content);
-        if (loaded) {
-          if (Array.isArray(loaded.records)) this.memory.records = loaded.records;
-          if (Array.isArray(loaded.govmeshRequests)) this.memory.govmeshRequests = loaded.govmeshRequests;
-          if (Array.isArray(loaded.auditLogs)) this.memory.auditLogs = loaded.auditLogs;
-          if (Array.isArray(loaded.files)) this.memory.files = loaded.files;
-          if (Array.isArray(loaded.exceptions)) this.memory.exceptions = loaded.exceptions;
-          if (Array.isArray(loaded.transfers)) this.memory.transfers = loaded.transfers;
-        }
+        loadedData = JSON.parse(content);
       } else if (fs.existsSync(STORE_FILE)) {
         const content = fs.readFileSync(STORE_FILE, 'utf8');
-        const loaded = JSON.parse(content);
-        if (loaded) {
-          if (Array.isArray(loaded.records)) this.memory.records = loaded.records;
-          if (Array.isArray(loaded.govmeshRequests)) this.memory.govmeshRequests = loaded.govmeshRequests;
-          if (Array.isArray(loaded.auditLogs)) this.memory.auditLogs = loaded.auditLogs;
-          if (Array.isArray(loaded.files)) this.memory.files = loaded.files;
-          if (Array.isArray(loaded.exceptions)) this.memory.exceptions = loaded.exceptions;
-          if (Array.isArray(loaded.transfers)) this.memory.transfers = loaded.transfers;
+        loadedData = JSON.parse(content);
+      }
+
+      if (loadedData) {
+        if (Array.isArray(loadedData.records)) loadedRecords = loadedData.records;
+        if (Array.isArray(loadedData.govmeshRequests)) this.memory.govmeshRequests = loadedData.govmeshRequests;
+        if (Array.isArray(loadedData.auditLogs)) this.memory.auditLogs = loadedData.auditLogs;
+        if (Array.isArray(loadedData.files)) this.memory.files = loadedData.files;
+        if (Array.isArray(loadedData.exceptions)) this.memory.exceptions = loadedData.exceptions;
+        if (Array.isArray(loadedData.transfers)) this.memory.transfers = loadedData.transfers;
+      }
+
+      // Merge initial seed records with loaded records without deleting real production records
+      const existingMap = new Map();
+      if (Array.isArray(loadedRecords)) {
+        for (const r of loadedRecords) {
+          existingMap.set(r.applicationId, r);
         }
       }
+
+      for (const initRec of initialRecords) {
+        if (!existingMap.has(initRec.applicationId)) {
+          existingMap.set(initRec.applicationId, { ...initRec });
+        } else {
+          // Keep current status if officer reviewed/approved, but ensure demo metadata exists
+          const cur = existingMap.get(initRec.applicationId);
+          existingMap.set(initRec.applicationId, { ...initRec, status: cur.status || initRec.status, lastUpdated: cur.lastUpdated || initRec.lastUpdated, updatedAt: cur.updatedAt || initRec.updatedAt, reviewedBy: cur.reviewedBy || initRec.reviewedBy, approvedBy: cur.approvedBy || initRec.approvedBy, rejectedBy: cur.rejectedBy || initRec.rejectedBy, rejectionReason: cur.rejectionReason || initRec.rejectionReason });
+        }
+      }
+
+      this.memory.records = sortRecordsWith124Top(Array.from(existingMap.values()));
     } catch (e) {
       console.error('Error loading data store file:', e);
+      this.memory.records = sortRecordsWith124Top([...initialRecords]);
     }
   }
 
@@ -280,24 +626,27 @@ class DataStore {
   }
 
   async getRecords(statusFilter = null) {
+    let list = this.memory.records;
     if (this.usePostgres && this.pool) {
       try {
-        let query = 'SELECT id, application_id as "applicationId", department_application_id as "departmentApplicationId", citizen_ref as "citizenRef", citizen_name as "citizenName", address, district, state, service, received_date as "receivedDate", received_at as "receivedAt", status, last_updated as "lastUpdated", updated_at as "updatedAt", consent_id as "consentId", verified, correlation_id as "correlationId", rejection_reason as "rejectionReason", reviewed_by as "reviewedBy" FROM records ORDER BY received_date DESC';
+        let query = 'SELECT id, application_id as "applicationId", department_application_id as "departmentApplicationId", citizen_ref as "citizenRef", citizen_name as "citizenName", address, district, state, service, received_date as "receivedDate", received_at as "receivedAt", status, last_updated as "lastUpdated", updated_at as "updatedAt", consent_id as "consentId", verified, correlation_id as "correlationId", rejection_reason as "rejectionReason", reviewed_by as "reviewedBy" FROM records ORDER BY CASE WHEN application_id = \'GM-2026-000124\' THEN 0 ELSE 1 END, received_date DESC';
         if (statusFilter) {
-          query = `SELECT id, application_id as "applicationId", department_application_id as "departmentApplicationId", citizen_ref as "citizenRef", citizen_name as "citizenName", address, district, state, service, received_date as "receivedDate", received_at as "receivedAt", status, last_updated as "lastUpdated", updated_at as "updatedAt", consent_id as "consentId", verified, correlation_id as "correlationId", rejection_reason as "rejectionReason", reviewed_by as "reviewedBy" FROM records WHERE status = $1 ORDER BY received_date DESC`;
+          query = `SELECT id, application_id as "applicationId", department_application_id as "departmentApplicationId", citizen_ref as "citizenRef", citizen_name as "citizenName", address, district, state, service, received_date as "receivedDate", received_at as "receivedAt", status, last_updated as "lastUpdated", updated_at as "updatedAt", consent_id as "consentId", verified, correlation_id as "correlationId", rejection_reason as "rejectionReason", reviewed_by as "reviewedBy" FROM records WHERE status = $1 ORDER BY CASE WHEN application_id = 'GM-2026-000124' THEN 0 ELSE 1 END, received_date DESC`;
           const res = await this.pool.query(query, [statusFilter]);
-          return res.rows;
+          list = res.rows;
+        } else {
+          const res = await this.pool.query(query);
+          list = res.rows;
         }
-        const res = await this.pool.query(query);
-        return res.rows;
       } catch (e) {
         console.error('PG error getting records:', e);
       }
     }
+    const sorted = sortRecordsWith124Top(list);
     if (statusFilter) {
-      return this.memory.records.filter(r => (r.status || '').toUpperCase() === statusFilter.toUpperCase());
+      return sorted.filter(r => (r.status || '').toUpperCase() === statusFilter.toUpperCase());
     }
-    return this.memory.records;
+    return sorted;
   }
 
   async getRecordByAppIdOrDeptId(id) {
@@ -339,6 +688,7 @@ class DataStore {
     }
 
     this.memory.records.unshift(recordObj);
+    this.memory.records = sortRecordsWith124Top(this.memory.records);
     this.saveToFile();
     return recordObj;
   }

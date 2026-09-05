@@ -75,8 +75,11 @@ export interface ServiceRecord {
   departmentApplicationId?: string;
   applicationId: string;
   citizenRef: string;
+  citizenId?: string;
   citizenName: string;
+  name?: string;
   address: string;
+  addressObj?: any;
   district: string;
   state?: string;
   service: string;
@@ -89,6 +92,17 @@ export interface ServiceRecord {
   verified: boolean;
   correlationId?: string;
   rejectionReason?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  rejectedBy?: string;
+  reviewedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  source?: string;
+  gateway?: string;
+  priority?: string;
+  description?: string;
+  isDemo?: boolean;
 }
 
 export interface FailedTransfer {
